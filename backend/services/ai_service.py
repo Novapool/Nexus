@@ -339,7 +339,7 @@ Ensure the command is safe and appropriate for the target system."""
             # Look for command patterns
             for line in lines:
                 line = line.strip()
-                if line.startswith('```') or line.startswith(') or line.startswith('#'):
+                if line.startswith('```') or line.startswith('$') or line.startswith('#'):
                     continue
                 if line and not line.startswith('The') and not line.startswith('This'):
                     command = line.split()[0] if line.split() else ""

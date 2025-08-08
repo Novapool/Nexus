@@ -111,16 +111,6 @@ app = create_application()
 app.add_exception_handler(NexusException, nexus_exception_handler)
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "nexus-api",
-        "version": "1.0.0"
-    }
-
-
 if __name__ == "__main__":
     import uvicorn
     

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
         description="Access token expiration time in minutes"
     )
     allowed_hosts: List[str] = Field(
-        default=["localhost", "127.0.0.1", "192.168.*"],
+        default=["localhost", "127.0.0.1", "*"],
         description="Allowed host patterns"
     )
     
