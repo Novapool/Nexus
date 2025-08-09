@@ -4,8 +4,8 @@ Application configuration management using Pydantic Settings
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
-from pydantic import Field
+from typing import List, Optional, Union
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,10 +34,19 @@ class Settings(BaseSettings):
         default=30, 
         description="Access token expiration time in minutes"
     )
-    allowed_hosts: List[str] = Field(
+    allowed_hosts: Union[List[str], str] = Field(
         default=["localhost", "127.0.0.1", "*"],
         description="Allowed host patterns"
     )
+    
+    @field_validator('allowed_hosts', mode='before')
+    @classmethod
+    def parse_allowed_hosts(cls, v):
+        """Parse allowed_hosts from string or list"""
+        if isinstance(v, str):
+            # Split by comma and strip whitespace
+            return [host.strip() for host in v.split(',') if host.strip()]
+        return v
     
     # Database settings
     database_url: str = Field(

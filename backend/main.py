@@ -20,6 +20,7 @@ sys.path.append(str(project_root))
 from backend.config.settings import get_settings
 from backend.config.database import init_db, close_db
 from backend.api.routes import api_router
+from backend.api.routes import health  # Import health router separately
 from backend.core.exceptions import NexusException
 
 
@@ -55,8 +56,8 @@ def create_application() -> FastAPI:
         title="Nexus Server Management API",
         description="AI-powered server management system with natural language interface",
         version="1.0.0",
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs",  # Always enable docs for development
+        redoc_url="/redoc",  # Always enable redoc for development
         lifespan=lifespan
     )
     
@@ -76,19 +77,32 @@ def create_application() -> FastAPI:
             allow_headers=["*"],
         )
     
-    # Include API routes
+    # Include health check at root level
+    app.include_router(
+        health.router,
+        prefix="/health",
+        tags=["health"]
+    )
+    
+    # Include all API routes under /api/v1
     app.include_router(api_router, prefix="/api/v1")
     
-    # Serve static files (frontend)
+    # Add a simple root endpoint
+    @app.get("/")
+    async def root():
+        return {"message": "Nexus Server Management API", "docs": "/docs", "health": "/health"}
+    
+    # Serve static files (frontend) - but don't mount at root to avoid conflicts
     if settings.serve_static:
         try:
             static_dir = project_root / "frontend" / "static"
             if static_dir.exists():
                 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
             
-            frontend_dir = project_root / "frontend"
-            if frontend_dir.exists():
-                app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+            # Don't mount frontend at root - it conflicts with API routes
+            # frontend_dir = project_root / "frontend"
+            # if frontend_dir.exists():
+            #     app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
         except Exception as e:
             logger.warning(f"Could not mount static files: {e}")
     
