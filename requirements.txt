@@ -1,22 +1,39 @@
-# requirements.txt
+# Core FastAPI Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 pydantic-settings==2.0.3
+
+# Database & ORM
 sqlalchemy==2.0.23
 aiosqlite==0.19.0
 alembic==1.12.1
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-dotenv==1.0.0
+
+# HTTP Client & WebSockets
 httpx==0.25.2
-aiofiles==23.2.1
 websockets==12.0
 
-# Development dependencies
+# File handling & multipart
+python-multipart==0.0.6
+aiofiles==23.2.1
+
+# Security & Authentication
+cryptography>=41.0.0,<46.0.0
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
+# Configuration & Environment
+python-dotenv==1.0.0
+
+# SSH Connectivity (NEW)
+asyncssh==2.14.2
+
+# Development & Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
 black==23.11.0
 isort==5.12.0
 flake8==6.1.0
+
+# Optional: For better async performance
+uvloop==0.19.0; sys_platform != "win32"
