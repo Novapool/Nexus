@@ -1,5 +1,5 @@
 """
-AI service for command generation and processing
+AI service for command generation and processing with gpt-oss integration
 """
 
 import asyncio
@@ -22,12 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """Service for AI-powered command generation and processing"""
+    """Service for AI-powered command generation and processing with gpt-oss support"""
     
     def __init__(self):
         self.settings = get_settings()
         self.current_model = self.settings.ai_model_name
         self.client = httpx.AsyncClient(timeout=self.settings.ai_timeout)
+        self.use_harmony_format = self.settings.ai_use_harmony_format and "gpt-oss" in self.current_model
     
     async def generate_command(
         self,
@@ -43,7 +44,7 @@ class AIService:
             system_prompt = self._build_system_prompt(server_context, os_type, reasoning_level)
             full_prompt = self._build_command_prompt(prompt, server_context)
             
-            # Call AI model
+            # Call AI model with gpt-oss specific formatting
             response = await self._call_ollama(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
@@ -85,6 +86,10 @@ class AIService:
             Explain shell commands clearly and thoroughly. Break down complex commands 
             into their components and explain what each part does."""
             
+            # Add gpt-oss reasoning prefix if using harmony format
+            if self.use_harmony_format:
+                system_prompt = self.settings.get_ai_system_prompt_prefix() + system_prompt
+            
             prompt = f"""Please explain this shell command in detail:
 
 Command: {command}
@@ -95,7 +100,17 @@ Please provide:
 3. Any potential warnings or considerations
 4. Examples of similar usage if helpful
 
-{f"Context: {context}" if context else ""}"""
+{f"Context: {context}" if context else ""}
+
+Provide your response in JSON format:
+{{
+    "explanation": "clear explanation of what it does",
+    "breakdown": [
+        {{"component": "part of command", "explanation": "what this part does"}}
+    ],
+    "warnings": ["warning 1", "warning 2"],
+    "examples": ["example 1", "example 2"]
+}}"""
             
             response = await self._call_ollama(prompt, system_prompt)
             parsed_response = self._parse_explanation_response(response)
@@ -197,6 +212,7 @@ Please provide:
                 return False
             
             self.current_model = model_name
+            self.use_harmony_format = self.settings.ai_use_harmony_format and "gpt-oss" in model_name
             logger.info(f"Switched to model: {model_name}")
             return True
             
@@ -210,22 +226,37 @@ Please provide:
         system_prompt: Optional[str] = None,
         reasoning_level: ReasoningLevel = ReasoningLevel.MEDIUM
     ) -> str:
-        """Call Ollama API for text generation"""
+        """Call Ollama API for text generation with gpt-oss support"""
         
         messages = []
+        
+        # Build system prompt for gpt-oss
         if system_prompt:
+            # Add reasoning level for gpt-oss if using harmony format
+            if self.use_harmony_format:
+                if not system_prompt.startswith("Reasoning:"):
+                    system_prompt = f"Reasoning: {reasoning_level.value}\n\n{system_prompt}"
+            
             messages.append({"role": "system", "content": system_prompt})
         
-        # Add reasoning level to prompt
-        reasoning_instruction = f"Reasoning: {reasoning_level.value}"
-        full_prompt = f"{reasoning_instruction}\n\n{prompt}"
-        messages.append({"role": "user", "content": full_prompt})
+        # Add user message
+        messages.append({"role": "user", "content": prompt})
         
         payload = {
             "model": self.current_model,
             "messages": messages,
             "stream": False
         }
+        
+        # Add gpt-oss specific options if applicable
+        if "gpt-oss" in self.current_model:
+            payload.update({
+                "options": {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "max_tokens": 2048
+                }
+            })
         
         try:
             response = await self.client.post(
@@ -237,7 +268,13 @@ Please provide:
                 raise AIServiceError(f"Ollama API error: HTTP {response.status_code}")
             
             data = response.json()
-            return data["message"]["content"]
+            content = data["message"]["content"]
+            
+            # Log reasoning if using gpt-oss with chain of thought
+            if self.use_harmony_format and self.settings.ai_enable_chain_of_thought:
+                logger.debug(f"gpt-oss reasoning output: {content[:500]}...")
+            
+            return content
             
         except httpx.TimeoutException:
             raise AIServiceError("AI service timeout")
@@ -269,6 +306,10 @@ Response format (JSON):
     "reasoning": "step-by-step thinking process",
     "alternatives": ["alternative command 1", "alternative command 2"]
 }"""
+        
+        # Add gpt-oss reasoning prefix if using harmony format
+        if self.use_harmony_format:
+            base_prompt = self.settings.get_ai_system_prompt_prefix() + base_prompt
         
         # Add OS-specific context
         os_context = {
@@ -319,6 +360,15 @@ Ensure the command is safe and appropriate for the target system."""
     def _parse_command_response(self, response: str) -> Dict[str, Any]:
         """Parse AI response for command generation"""
         try:
+            # Handle gpt-oss chain of thought output
+            if self.use_harmony_format and "<thinking>" in response:
+                # Extract JSON from gpt-oss thinking tags
+                import re
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                    return json.loads(json_str)
+            
             # Try to extract JSON from response
             start_idx = response.find('{')
             end_idx = response.rfind('}') + 1
@@ -355,6 +405,14 @@ Ensure the command is safe and appropriate for the target system."""
     def _parse_explanation_response(self, response: str) -> Dict[str, Any]:
         """Parse AI response for command explanation"""
         try:
+            # Handle gpt-oss chain of thought output
+            if self.use_harmony_format and "<thinking>" in response:
+                import re
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                    return json.loads(json_str)
+            
             # Try JSON first
             start_idx = response.find('{')
             end_idx = response.rfind('}') + 1

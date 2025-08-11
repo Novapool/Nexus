@@ -54,24 +54,35 @@ class Settings(BaseSettings):
         description="Database connection URL"
     )
     
-    # AI/Ollama settings
+    # AI/Ollama settings - Updated for gpt-oss
     ai_provider: str = Field(default="ollama", description="AI provider (ollama, transformers)")
     ollama_base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
     ai_model_name: str = Field(default="gpt-oss:20b", description="AI model to use")
-    ai_timeout: int = Field(default=60, description="AI request timeout in seconds")
+    ai_timeout: int = Field(default=120, description="AI request timeout in seconds (increased for gpt-oss)")
     max_reasoning_level: str = Field(
-        default="medium", 
+        default="high", 
         description="Maximum AI reasoning level (low, medium, high)"
     )
+    
+    # gpt-oss specific settings
+    ai_use_harmony_format: bool = Field(default=True, description="Use harmony response format for gpt-oss")
+    ai_default_reasoning: str = Field(default="medium", description="Default reasoning level for gpt-oss")
+    ai_enable_chain_of_thought: bool = Field(default=True, description="Enable full chain-of-thought output")
     
     # SSH settings
     ssh_timeout: int = Field(default=30, description="SSH connection timeout")
     ssh_connection_timeout: int = Field(default=300, description="SSH idle connection timeout")
-    max_ssh_connections: int = Field(default=1, description="Maximum concurrent SSH connections")
+    max_ssh_connections: int = Field(default=10, description="Maximum concurrent SSH connections")
     ssh_key_path: Optional[str] = Field(default=None, description="Default SSH key path")
     ssh_default_safety_level: str = Field(default="cautious", description="Default command safety level")
     ssh_max_command_timeout: int = Field(default=120, description="Maximum command execution timeout")
     ssh_strict_host_key_checking: bool = Field(default=False, description="Enable SSH host key verification")
+    
+    # Operation planning settings
+    operation_max_steps: int = Field(default=50, description="Maximum steps in an operation plan")
+    operation_default_timeout: int = Field(default=3600, description="Default operation timeout in seconds")
+    operation_enable_rollback: bool = Field(default=True, description="Enable automatic rollback generation")
+    operation_require_approval_for_high_risk: bool = Field(default=True, description="Require approval for high-risk operations")
     
     # Logging settings
     log_level: str = Field(default="INFO", description="Logging level")
@@ -87,12 +98,20 @@ class Settings(BaseSettings):
     enable_websockets: bool = Field(default=True, description="Enable WebSocket endpoints")
     enable_ai: bool = Field(default=True, description="Enable AI features")
     enable_audit_logging: bool = Field(default=True, description="Enable audit logging for SSH commands")
+    enable_operation_planning: bool = Field(default=True, description="Enable operation planning features")
+    enable_batch_operations: bool = Field(default=True, description="Enable batch operation execution")
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Ensure directories exist
         self.data_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
+    
+    def get_ai_system_prompt_prefix(self) -> str:
+        """Get the system prompt prefix for gpt-oss model"""
+        if self.ai_use_harmony_format and "gpt-oss" in self.ai_model_name:
+            return f"Reasoning: {self.ai_default_reasoning}\n\n"
+        return ""
 
 
 @lru_cache()
