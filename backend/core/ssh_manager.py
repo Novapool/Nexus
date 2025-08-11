@@ -83,7 +83,7 @@ class SSHManager:
                 await self.disconnect()
             
             # Check if we already have a valid connection
-            if self._connection and not self._connection.is_client_closed():
+            if self._connection:
                 # Test the connection
                 try:
                     await asyncio.wait_for(
@@ -139,7 +139,7 @@ class SSHManager:
     
     async def disconnect(self):
         """Close SSH connection"""
-        if self._connection and not self._connection.is_client_closed():
+        if self._connection:
             try:
                 self._connection.close()
                 await self._connection.wait_closed()
@@ -153,7 +153,7 @@ class SSHManager:
     
     def is_connected(self) -> bool:
         """Check if SSH connection is active"""
-        if not self._connection or self._connection.is_client_closed():
+        if not self._connection:
             return False
         
         # Check connection timeout
@@ -161,6 +161,9 @@ class SSHManager:
             logger.debug("Connection timed out")
             return False
         
+        # For AsyncSSH 2.14.2, we can't easily check if connection is closed
+        # without making a call, so we assume it's connected if we have a connection
+        # object and it hasn't timed out. The actual test will happen when we try to use it.
         return True
     
     async def execute_command(
