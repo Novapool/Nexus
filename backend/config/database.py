@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 from backend.config.settings import get_settings
 import logging
+from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,9 @@ async def init_db():
         expire_on_commit=False
     )
     
+    # Import all models to ensure they're registered
+    from backend.models import database, operations
+    
     # Create all tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -54,7 +58,7 @@ async def close_db():
         logger.info("Database engine disposed")
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get database session"""
     if not async_session_maker:
         raise RuntimeError("Database not initialized. Call init_db() first.")

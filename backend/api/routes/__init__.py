@@ -3,7 +3,7 @@ API Routes initialization and router setup
 """
 
 from fastapi import APIRouter
-from backend.api.routes import health, servers, ai, terminal, auth
+from backend.api.routes import health, servers, ai, terminal, auth, operations
 
 # Create main API router
 api_router = APIRouter()
@@ -37,4 +37,11 @@ api_router.include_router(
     terminal.router,
     prefix="/terminal",
     tags=["terminal"]
+)
+
+# Add operations router
+api_router.include_router(
+    operations.router,
+    prefix="/operations",
+    tags=["operations"]
 )
