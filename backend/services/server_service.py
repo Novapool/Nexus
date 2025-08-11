@@ -1,5 +1,5 @@
 """
-Server management business logic service
+Server management business logic service with SSH integration
 """
 
 import asyncio
@@ -18,7 +18,9 @@ from backend.models.schemas import (
     SystemInfo
 )
 from backend.core.exceptions import ServerNotFoundError, SSHConnectionError
+from backend.core.ssh_manager import ssh_factory, SafetyLevel
 from backend.utils.crypto import encrypt_password, decrypt_password
+from backend.config.settings import get_settings
 import uuid
 import datetime
 
@@ -26,10 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 class ServerService:
-    """Service class for server management operations"""
+    """Service class for server management operations with SSH integration"""
     
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.settings = get_settings()
     
     async def get_servers(self, skip: int = 0, limit: int = 100) -> List[ServerResponse]:
         """Get list of servers with pagination"""
@@ -128,6 +131,13 @@ class ServerService:
         if not server:
             return False
         
+        # Disconnect any active SSH connections
+        try:
+            manager = await ssh_factory.get_manager(server_id)
+            await manager.disconnect()
+        except Exception as e:
+            logger.warning(f"Error disconnecting SSH for deleted server {server_id}: {e}")
+        
         await self.db.delete(server)
         await self.db.commit()
         
@@ -141,30 +151,35 @@ class ServerService:
             raise ServerNotFoundError(server_id)
         
         try:
-            # TODO: Implement actual SSH connection test
-            # This is a placeholder that simulates connection testing
-            await asyncio.sleep(0.1)  # Simulate network delay
+            # Get SSH manager and connect
+            manager = await self._get_ssh_manager(server_id)
             
-            # For now, return a mock successful connection
-            connection_result = {
-                "success": True,
-                "response_time_ms": 50,
+            # Test connection
+            result = await manager.test_connection()
+            
+            # Update connection status in database
+            await self._update_connection_status(server_id, "connected")
+            
+            logger.info(f"Connection test successful for {server.hostname}")
+            return result
+            
+        except SSHConnectionError as e:
+            # Update connection status as failed
+            await self._update_connection_status(server_id, "failed")
+            logger.error(f"Connection test failed for {server_id}: {e}")
+            
+            return {
+                "success": False,
+                "error": str(e),
                 "server_info": {
                     "hostname": server.hostname,
                     "port": server.port,
-                    "reachable": True
-                },
-                "tested_at": datetime.datetime.utcnow().isoformat()
+                    "connected": False
+                }
             }
-            
-            # Update last_connected timestamp
-            await self._update_connection_status(server_id, "connected")
-            
-            return connection_result
-            
         except Exception as e:
-            logger.error(f"Connection test failed for {server_id}: {e}")
             await self._update_connection_status(server_id, "failed")
+            logger.error(f"Unexpected error during connection test for {server_id}: {e}")
             raise SSHConnectionError(f"Connection test failed: {str(e)}")
     
     async def get_server_context(self, server_id: str) -> Dict[str, Any]:
@@ -173,31 +188,157 @@ class ServerService:
         if not server:
             raise ServerNotFoundError(server_id)
         
-        # TODO: Implement actual system information gathering
-        # This would require SSH connection to gather real system info
-        context = {
+        try:
+            # Get SSH manager and connect
+            manager = await self._get_ssh_manager(server_id)
+            
+            # Gather system information
+            system_info = await manager.gather_system_info()
+            
+            # Build comprehensive context
+            context = {
+                "server_id": server_id,
+                "hostname": server.hostname,
+                "os_type": server.os_type,
+                "username": server.username,
+                "port": server.port,
+                "description": server.description,
+                "system_info": system_info,
+                "capabilities": {
+                    "package_manager": system_info.get("package_manager", "unknown"),
+                    "shell": system_info.get("shell", "/bin/bash"),
+                    "architecture": system_info.get("architecture", "unknown"),
+                    "os_version": system_info.get("os_release", "unknown")
+                },
+                "current_state": {
+                    "working_directory": system_info.get("working_dir", "/"),
+                    "user": system_info.get("user", server.username),
+                    "uptime": system_info.get("uptime", "unknown")
+                }
+            }
+            
+            # Update connection status
+            await self._update_connection_status(server_id, "connected")
+            
+            logger.info(f"Successfully gathered context for {server.hostname}")
+            return context
+            
+        except SSHConnectionError as e:
+            logger.error(f"Failed to gather context for {server_id}: {e}")
+            await self._update_connection_status(server_id, "failed")
+            
+            # Return basic context without system info
+            return {
+                "server_id": server_id,
+                "hostname": server.hostname,
+                "os_type": server.os_type,
+                "username": server.username,
+                "port": server.port,
+                "description": server.description,
+                "error": f"Could not connect to gather system info: {str(e)}",
+                "system_info": {},
+                "capabilities": {
+                    "package_manager": self._guess_package_manager(OSType(server.os_type)),
+                    "shell": "/bin/bash",
+                    "architecture": "unknown",
+                    "os_version": "unknown"
+                }
+            }
+    
+    async def execute_command(
+        self, 
+        server_id: str, 
+        command: str, 
+        working_dir: Optional[str] = None,
+        timeout: int = 30,
+        safety_level: Optional[SafetyLevel] = None
+    ) -> Dict[str, Any]:
+        """Execute command on server via SSH"""
+        server = await self.get_server(server_id)
+        if not server:
+            raise ServerNotFoundError(server_id)
+        
+        try:
+            # Get SSH manager
+            manager = await self._get_ssh_manager(server_id)
+            
+            # Set safety level if provided
+            if safety_level:
+                manager.set_safety_level(safety_level)
+            
+            # Execute command
+            result = await manager.execute_command(
+                command=command,
+                working_dir=working_dir,
+                timeout=timeout
+            )
+            
+            # Update connection status
+            await self._update_connection_status(server_id, "connected")
+            
+            logger.info(f"Command executed on {server.hostname}: {command}")
+            return result.to_dict()
+            
+        except SSHConnectionError as e:
+            logger.error(f"Command execution failed on {server_id}: {e}")
+            await self._update_connection_status(server_id, "failed")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error executing command on {server_id}: {e}")
+            raise SSHConnectionError(f"Command execution failed: {str(e)}")
+    
+    async def get_system_info(self, server_id: str) -> Dict[str, Any]:
+        """Get detailed system information from server"""
+        server = await self.get_server(server_id)
+        if not server:
+            raise ServerNotFoundError(server_id)
+        
+        try:
+            manager = await self._get_ssh_manager(server_id)
+            system_info = await manager.gather_system_info()
+            
+            await self._update_connection_status(server_id, "connected")
+            
+            return {
+                "server_id": server_id,
+                "hostname": server.hostname,
+                "collected_at": datetime.datetime.utcnow().isoformat(),
+                **system_info
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get system info for {server_id}: {e}")
+            await self._update_connection_status(server_id, "failed")
+            raise SSHConnectionError(f"Failed to get system info: {str(e)}")
+    
+    async def _get_ssh_manager(self, server_id: str):
+        """Get SSH manager and ensure connection"""
+        # Get server data
+        query = select(Server).where(Server.id == server_id)
+        result = await self.db.execute(query)
+        server = result.scalar_one_or_none()
+        
+        if not server:
+            raise ServerNotFoundError(server_id)
+        
+        # Prepare server data for SSH connection
+        server_data = {
             "hostname": server.hostname,
-            "os_type": server.os_type,
             "username": server.username,
             "port": server.port,
-            "description": server.description,
-            # Mock system info - replace with real data later
-            "system_info": {
-                "architecture": "x86_64",
-                "kernel": "Linux 5.4.0",
-                "shell": "/bin/bash",
-                "package_manager": self._guess_package_manager(server.os_type),
-                "available_commands": ["ls", "cd", "mkdir", "rm", "cp", "mv", "nano", "vim"]
-            }
+            "password": server.password,  # Will be decrypted by ssh_factory
+            "timeout": self.settings.ssh_timeout
         }
         
-        return context
+        # Get connected manager
+        manager = await ssh_factory.connect_to_server(server_id, server_data)
+        return manager
     
     def _guess_package_manager(self, os_type: OSType) -> str:
         """Guess package manager based on OS type"""
         package_managers = {
             OSType.UBUNTU: "apt",
-            OSType.DEBIAN: "apt",
+            OSType.DEBIAN: "apt", 
             OSType.CENTOS: "yum",
             OSType.RHEL: "yum",
             OSType.ALPINE: "apk",
@@ -215,3 +356,23 @@ class ServerService:
             server.connection_status = status
             server.last_connected = datetime.datetime.utcnow()
             await self.db.commit()
+    
+    async def disconnect_server(self, server_id: str) -> bool:
+        """Manually disconnect SSH connection for a server"""
+        try:
+            manager = await ssh_factory.get_manager(server_id)
+            await manager.disconnect()
+            await self._update_connection_status(server_id, "disconnected")
+            logger.info(f"Disconnected from server: {server_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error disconnecting from server {server_id}: {e}")
+            return False
+    
+    async def cleanup_connections(self):
+        """Clean up inactive SSH connections"""
+        try:
+            await ssh_factory.cleanup_inactive()
+            logger.info("SSH connection cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during SSH cleanup: {e}")

@@ -3,6 +3,7 @@ Server management API endpoints
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from backend.core.ssh_manager import SafetyLevel
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from backend.config.database import get_db
@@ -134,3 +135,47 @@ async def test_connection(
             "connection_status": "failed",
             "error": str(e)
         }
+    
+
+# Add this endpoint after your existing endpoints in servers.py
+@router.post("/{server_id}/execute")
+async def execute_command(
+    server_id: str,
+    command: str,
+    safety_level: str = "dry_run",
+    working_dir: str = None,
+    timeout: int = 30,
+    db: AsyncSession = Depends(get_db)
+):
+    """Execute command on server with safety level"""
+    server_service = ServerService(db)
+    
+    # Map string to enum
+    safety_map = {
+        "dry_run": SafetyLevel.DRY_RUN,
+        "safe": SafetyLevel.SAFE,
+        "cautious": SafetyLevel.CAUTIOUS, 
+        "full": SafetyLevel.FULL
+    }
+    
+    safety = safety_map.get(safety_level, SafetyLevel.DRY_RUN)
+    
+    try:
+        result = await server_service.execute_command(
+            server_id=server_id,
+            command=command,
+            working_dir=working_dir,
+            timeout=timeout,
+            safety_level=safety
+        )
+        return {
+            "server_id": server_id,
+            "executed_command": command,
+            "safety_level": safety_level,
+            "result": result
+        }
+    except ServerNotFoundError:
+        raise
+    except Exception as e:
+        logger.error(f"Command execution failed for {server_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
