@@ -41,7 +41,7 @@ async def init_db():
     )
     
     # Import all models to ensure they're registered
-    from backend.models import database, operations
+    from backend.models import database
     
     # Create all tables
     async with engine.begin() as conn:

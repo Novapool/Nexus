@@ -61,12 +61,6 @@ def create_application() -> FastAPI:
         lifespan=lifespan
     )
     
-    # Add security middleware
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=settings.allowed_hosts
-    )
-    
     # Add CORS middleware for local development
     if settings.debug:
         app.add_middleware(

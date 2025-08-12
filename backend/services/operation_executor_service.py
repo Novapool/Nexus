@@ -15,10 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
-from backend.models.operations import (
+from backend.models.database import (
     OperationPlan, OperationStep, OperationExecution, OperationStepExecution
 )
-from backend.models.operation_schemas import (
+from backend.models.schemas import (
     OperationExecutionRequest, OperationExecutionSchema, OperationStepExecutionSchema,
     ExecutionMode, ExecutionStatus, StepStatus, ExecutionProgress,
     StepApprovalRequest, OperationError

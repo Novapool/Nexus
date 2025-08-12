@@ -1,24 +1,18 @@
 """
-API Routes initialization and router setup
+Simplified API Routes initialization
 """
 
 from fastapi import APIRouter
-from backend.api.routes import health, servers, ai, terminal, auth, operations
+from backend.api.routes import health, servers, ai, operations
 
 # Create main API router
 api_router = APIRouter()
 
-# Include all route modules
+# Include only implemented routes
 api_router.include_router(
     health.router,
     prefix="/health",
     tags=["health"]
-)
-
-api_router.include_router(
-    auth.router,
-    prefix="/auth",
-    tags=["authentication"]
 )
 
 api_router.include_router(
@@ -33,15 +27,11 @@ api_router.include_router(
     tags=["ai"]
 )
 
-api_router.include_router(
-    terminal.router,
-    prefix="/terminal",
-    tags=["terminal"]
-)
-
-# Add operations router
+# Operations router is optional - include only if operation planning is enabled
 api_router.include_router(
     operations.router,
     prefix="/operations",
     tags=["operations"]
 )
+
+# Note: auth and terminal routes removed (not implemented)

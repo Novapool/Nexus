@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import asyncio
 from backend.config.database import get_db
-from backend.models.operation_schemas import (
+from backend.models.schemas import (
     OperationPlanRequest, OperationPlanResponse, OperationPlanSchema,
     OperationExecutionRequest, OperationExecutionResponse, OperationExecutionSchema,
     ExecutionProgress, StepApprovalRequest, OperationType, ExecutionStatus,

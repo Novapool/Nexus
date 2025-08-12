@@ -16,14 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from backend.models.operations import OperationPlan, OperationStep, OperationTemplate
-from backend.models.operation_schemas import (
+from backend.models.database import OperationPlan, OperationStep, OperationTemplate
+from backend.models.schemas import (
     OperationPlanRequest, OperationPlanSchema, OperationStepSchema,
     OperationType, PlanValidationResult,
-    OperationTemplateSchema
+    OperationTemplateSchema,
+    OSType, RiskLevel, ReasoningLevel
 )
-# Fixed: Add missing imports
-from backend.models.schemas import OSType, RiskLevel, ReasoningLevel
 from backend.services.ai_service import AIService
 from backend.services.server_service import ServerService
 from backend.core.exceptions import AIServiceError, ServerNotFoundError
