@@ -35,10 +35,15 @@ class Settings(BaseSettings):
     ssh_safety_level: str = Field(default="cautious", description="Default command safety level")
     ssh_max_connections: int = Field(default=10, description="Maximum concurrent SSH connections")
     
-    # Features (3 essential settings)
-    enable_operation_planning: bool = Field(default=True, description="Enable operation planning features")
+    # Features (5 essential settings)
+    enable_operation_planning: bool = Field(default=False, description="Enable operation planning features")
+    enable_quick_commands: bool = Field(default=True, description="Enable simple command execution")
     enable_ai: bool = Field(default=True, description="Enable AI features")
     serve_static: bool = Field(default=True, description="Serve static frontend files")
+    
+    # gpt-oss specific settings (2 additional settings)
+    ai_use_harmony_format: bool = Field(default=True, description="Use gpt-oss harmony format")
+    ai_enable_chain_of_thought: bool = Field(default=True, description="Enable chain-of-thought reasoning")
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

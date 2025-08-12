@@ -1,0 +1,101 @@
+# Pre-commit hooks configuration for Nexus project
+repos:
+  # Black - Code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.11.0
+    hooks:
+      - id: black
+        language_version: python3.9
+        args: ["--line-length=88"]
+        files: ^backend/.*\.py$
+
+  # isort - Import organization
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: 
+          - "--profile=black"
+          - "--line-length=88"
+          - "--multi-line=3"
+          - "--known-first-party=backend,tests"
+          - "--sections=FUTURE,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
+        files: ^backend/.*\.py$
+
+  # flake8 - Linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        args: 
+          - "--max-line-length=88"
+          - "--extend-ignore=E203,W503"
+          - "--per-file-ignores=__init__.py:F401"
+        files: ^backend/.*\.py$
+
+  # mypy - Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: 
+          - types-sqlalchemy>=1.4.0
+          - pydantic>=2.5.0
+        args: ["--config-file=mypy.ini"]
+        files: ^backend/.*\.py$
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        files: ^backend/.*\.(py|yaml|yml|json|md)$
+      
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+        files: ^backend/.*\.(py|yaml|yml|json|md)$
+      
+      # Check for merge conflicts
+      - id: check-merge-conflict
+      
+      # Check YAML syntax
+      - id: check-yaml
+        files: \.ya?ml$
+      
+      # Check JSON syntax
+      - id: check-json
+        files: \.json$
+      
+      # Check for large files
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      
+      # Check Python AST
+      - id: check-ast
+        files: ^backend/.*\.py$
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ["-r", "backend/", "-f", "json"]
+        files: ^backend/.*\.py$
+        exclude: ^backend/tests/.*$
+
+# Configuration
+default_stages: [commit]
+fail_fast: false
+
+# Exclude patterns
+exclude: |
+  (?x)^(
+    .*/__pycache__/.*|
+    .*\.pyc$|
+    .*\.pyo$|
+    .*\.egg-info/.*|
+    .*/\.venv/.*|
+    alembic/versions/.*\.py$|
+    scripts/.*\.py$
+  )$

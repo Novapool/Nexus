@@ -3,12 +3,13 @@ Simplified API Routes initialization
 """
 
 from fastapi import APIRouter
-from backend.api.routes import health, servers, ai, operations
+from backend.api.routes import health, servers, ai, operations, commands
+from backend.config.settings import get_settings
 
 # Create main API router
 api_router = APIRouter()
 
-# Include only implemented routes
+# Include core routes (always available)
 api_router.include_router(
     health.router,
     prefix="/health",
@@ -27,11 +28,21 @@ api_router.include_router(
     tags=["ai"]
 )
 
+# Include simple commands router (default enabled)
+settings = get_settings()
+if settings.enable_quick_commands:
+    api_router.include_router(
+        commands.router,
+        prefix="/commands",
+        tags=["commands"]
+    )
+
 # Operations router is optional - include only if operation planning is enabled
-api_router.include_router(
-    operations.router,
-    prefix="/operations",
-    tags=["operations"]
-)
+if settings.enable_operation_planning:
+    api_router.include_router(
+        operations.router,
+        prefix="/operations",
+        tags=["operations"]
+    )
 
 # Note: auth and terminal routes removed (not implemented)

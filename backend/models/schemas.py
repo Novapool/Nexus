@@ -36,6 +36,15 @@ class RiskLevel(str, Enum):
     DANGEROUS = "dangerous"
 
 
+class SafetyLevel(str, Enum):
+    """Safety levels for command execution"""
+    PARANOID = "paranoid"    # Only allow completely safe commands
+    SAFE = "safe"           # Allow low-risk commands
+    CAUTIOUS = "cautious"   # Allow medium-risk commands (default)
+    NORMAL = "normal"       # Allow high-risk commands
+    PERMISSIVE = "permissive"  # Allow all commands including dangerous ones
+
+
 # Server Schemas
 class ServerBase(BaseModel):
     """Base server schema"""
@@ -133,6 +142,20 @@ class CommandValidationResult(BaseModel):
     warnings: List[str] = []
     explanation: str
     suggested_fixes: List[str] = []
+
+
+class CommandResponse(BaseModel):
+    """Schema for command execution responses"""
+    success: bool
+    command: str
+    explanation: str
+    output: Optional[str] = None
+    error: Optional[str] = None
+    execution_time: float
+    safety_level: str
+    warnings: List[str] = []
+    exit_code: Optional[int] = None
+    requires_approval: Optional[bool] = None
 
 
 # Terminal Schemas

@@ -2,7 +2,7 @@
 Operation planning service for multi-step server operations
 """
 
-# type: ignore - Disable type checking for this entire file due to SQLAlchemy integration issues
+# Type-safe operation planning service with proper SQLAlchemy integration
 
 import asyncio
 import json
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from backend.models.database import OperationPlan, OperationStep, OperationTemplate
+from backend.models.database import OperationPlan
 from backend.models.schemas import (
     OperationPlanRequest, OperationPlanSchema, OperationStepSchema,
     OperationType, PlanValidationResult,
@@ -90,10 +90,35 @@ class OperationPlannerService:
             raise AIServiceError(f"Failed to generate operation plan: {str(e)}")
     
     async def save_plan(self, plan: OperationPlanSchema) -> str:
-        """Save operation plan to database"""
+        """Save operation plan to database using simplified schema"""
         plan_id = str(uuid.uuid4())
         
-        # Create plan record
+        # Prepare steps data as JSON
+        all_steps = plan.prerequisite_steps + plan.steps + plan.rollback_steps
+        steps_json = []
+        
+        for step_data in all_steps:
+            step_dict = {
+                "id": str(uuid.uuid4()),
+                "step_order": step_data.step_order,
+                "name": step_data.name,
+                "description": step_data.description,
+                "command": step_data.command,
+                "working_directory": step_data.working_directory,
+                "estimated_duration_seconds": step_data.estimated_duration_seconds,
+                "risk_level": step_data.risk_level.value,
+                "requires_approval": step_data.requires_approval,
+                "is_prerequisite": step_data.is_prerequisite,
+                "is_rollback_step": step_data.is_rollback_step,
+                "validation_command": step_data.validation_command,
+                "rollback_command": step_data.rollback_command,
+                "rollback_description": step_data.rollback_description,
+                "depends_on_steps": step_data.depends_on_steps,
+                "ai_reasoning": step_data.ai_reasoning
+            }
+            steps_json.append(step_dict)
+        
+        # Create plan record with JSON steps
         db_plan = OperationPlan(
             id=plan_id,
             name=plan.name,
@@ -107,47 +132,18 @@ class OperationPlannerService:
             ai_model_used=plan.ai_model_used,
             reasoning_level=plan.reasoning_level.value,
             generation_time_seconds=plan.generation_time_seconds,
-            status="draft"
+            status="draft",
+            steps_json=steps_json
         )
         
         self.db.add(db_plan)
-        
-        # Create step records
-        all_steps = plan.prerequisite_steps + plan.steps + plan.rollback_steps
-        for step_data in all_steps:
-            step_id = str(uuid.uuid4())
-            
-            db_step = OperationStep(
-                id=step_id,
-                plan_id=plan_id,
-                step_order=step_data.step_order,
-                name=step_data.name,
-                description=step_data.description,
-                command=step_data.command,
-                working_directory=step_data.working_directory,
-                estimated_duration_seconds=step_data.estimated_duration_seconds,
-                risk_level=step_data.risk_level.value,
-                requires_approval=step_data.requires_approval,
-                is_prerequisite=step_data.is_prerequisite,
-                is_rollback_step=step_data.is_rollback_step,
-                validation_command=step_data.validation_command,
-                rollback_command=step_data.rollback_command,
-                rollback_description=step_data.rollback_description,
-                depends_on_steps=step_data.depends_on_steps,
-                ai_reasoning=step_data.ai_reasoning
-            )
-            
-            self.db.add(db_step)
-        
         await self.db.commit()
         logger.info(f"Saved operation plan: {plan_id}")
         return plan_id
     
     async def get_plan(self, plan_id: str) -> Optional[OperationPlanSchema]:
         """Get operation plan by ID"""
-        query = select(OperationPlan).options(
-            selectinload(OperationPlan.steps)
-        ).where(OperationPlan.id == plan_id)
+        query = select(OperationPlan).where(OperationPlan.id == plan_id)
         
         result = await self.db.execute(query)
         db_plan = result.scalar_one_or_none()
@@ -166,9 +162,7 @@ class OperationPlannerService:
         limit: int = 100
     ) -> List[OperationPlanSchema]:
         """List operation plans with filters"""
-        query = select(OperationPlan).options(
-            selectinload(OperationPlan.steps)
-        )
+        query = select(OperationPlan)
         
         if server_id:
             query = query.where(OperationPlan.server_id == server_id)
@@ -313,42 +307,10 @@ class OperationPlannerService:
         return level_mapping.get(operation_type, ReasoningLevel.MEDIUM)
     
     async def _find_matching_template(self, prompt: str, os_type: Optional[str]) -> Optional[OperationTemplateSchema]:
-        """Find matching operation template"""
-        try:
-            # Query active templates
-            query = select(OperationTemplate).where(
-                OperationTemplate.is_active == True
-            ).order_by(OperationTemplate.usage_count.desc())
-            
-            result = await self.db.execute(query)
-            templates = result.scalars().all()
-            
-            # Simple keyword matching for now
-            prompt_lower = prompt.lower()
-            
-            for template in templates:
-                # Check OS compatibility
-                if os_type and hasattr(template, 'os_compatibility') and template.os_compatibility:
-                    if os_type not in [str(os) for os in template.os_compatibility]:
-                        continue
-                
-                # Check tags and name for matches
-                template_keywords = []
-                if hasattr(template, 'tags') and template.tags:
-                    template_keywords.extend([tag.lower() for tag in template.tags])
-                template_keywords.append(template.name.lower())
-                
-                # Simple keyword matching
-                for keyword in template_keywords:
-                    if keyword in prompt_lower:
-                        logger.info(f"Found matching template: {template.name}")
-                        return OperationTemplateSchema.model_validate(template)
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Template matching failed: {e}")
-            return None
+        """Find matching operation template - disabled until template system is implemented"""
+        # Templates are not implemented in current schema
+        # Return None to always use AI generation
+        return None
     
     async def _generate_plan_from_template(
         self, 
@@ -656,89 +618,47 @@ class OperationPlannerService:
             # Return plan as-is if validation fails
             return plan
     
-    async def _save_as_template(self, plan: OperationPlanSchema, template_name: str, server_context: Dict[str, Any]):
-        """Save plan as reusable template"""
-        try:
-            template_id = str(uuid.uuid4())
-            
-            # Prepare template data
-            template_data = {
-                "steps": [],
-                "prerequisite_steps": [],
-                "rollback_steps": []
-            }
-            
-            # Convert plan steps to template format
-            for step in plan.steps:
-                template_data["steps"].append({
-                    "name": step.name,
-                    "description": step.description,
-                    "command": step.command,
-                    "working_directory": step.working_directory,
-                    "estimated_duration_seconds": step.estimated_duration_seconds,
-                    "risk_level": step.risk_level.value,
-                    "requires_approval": step.requires_approval,
-                    "validation_command": step.validation_command,
-                    "rollback_command": step.rollback_command,
-                    "rollback_description": step.rollback_description,
-                    "depends_on_steps": step.depends_on_steps
-                })
-            
-            # Create template record
-            db_template = OperationTemplate(
-                id=template_id,
-                name=template_name,
-                description=plan.description,
-                category="user_generated",
-                operation_type=plan.operation_type.value,
-                template_data=template_data,
-                os_compatibility=[server_context.get("os_type", "linux")],
-                usage_count=0,
-                is_active=True,
-                is_verified=False
-            )
-            
-            self.db.add(db_template)
-            await self.db.commit()
-            
-            logger.info(f"Saved plan as template: {template_name}")
-            
-        except Exception as e:
-            logger.error(f"Failed to save template: {e}")
+    async def _save_as_template(self, plan: OperationPlanSchema, template_name: str, server_context: Dict[str, Any]) -> None:
+        """Save plan as reusable template - disabled until template system is implemented"""
+        # Templates are not implemented in current schema
+        # Just log the request for now
+        logger.info(f"Template save requested for '{template_name}' but template system is not implemented")
     
     async def _db_plan_to_schema(self, db_plan: OperationPlan) -> OperationPlanSchema:
-        """Convert database plan to schema"""
-        # Separate steps by type
+        """Convert database plan to schema using JSON data"""
+        # Separate steps by type from JSON data
         prerequisite_steps = []
         main_steps = []
         rollback_steps = []
         
-        for db_step in db_plan.steps:
-            step_schema = OperationStepSchema(
-                id=str(db_step.id),
-                step_order=int(db_step.step_order),
-                name=str(db_step.name),
-                description=str(db_step.description) if db_step.description else None,
-                command=str(db_step.command),
-                working_directory=str(db_step.working_directory) if db_step.working_directory else None,
-                estimated_duration_seconds=int(db_step.estimated_duration_seconds) if db_step.estimated_duration_seconds else None,
-                risk_level=RiskLevel(db_step.risk_level),
-                requires_approval=bool(db_step.requires_approval),
-                is_prerequisite=bool(db_step.is_prerequisite),
-                is_rollback_step=bool(db_step.is_rollback_step),
-                validation_command=str(db_step.validation_command) if db_step.validation_command else None,
-                rollback_command=str(db_step.rollback_command) if db_step.rollback_command else None,
-                rollback_description=str(db_step.rollback_description) if db_step.rollback_description else None,
-                depends_on_steps=db_step.depends_on_steps or [],
-                ai_reasoning=str(db_step.ai_reasoning) if db_step.ai_reasoning else None
-            )
-            
-            if db_step.is_prerequisite:
-                prerequisite_steps.append(step_schema)
-            elif db_step.is_rollback_step:
-                rollback_steps.append(step_schema)
-            else:
-                main_steps.append(step_schema)
+        # Parse steps from JSON
+        if db_plan.steps_json:
+            for step_data in db_plan.steps_json:
+                step_schema = OperationStepSchema(
+                    id=step_data.get("id"),
+                    step_order=int(step_data.get("step_order", 0)),
+                    name=str(step_data.get("name", "Unnamed Step")),
+                    description=step_data.get("description"),
+                    command=str(step_data.get("command", "")),
+                    working_directory=step_data.get("working_directory"),
+                    estimated_duration_seconds=step_data.get("estimated_duration_seconds"),
+                    risk_level=RiskLevel(step_data.get("risk_level", "safe")),
+                    requires_approval=bool(step_data.get("requires_approval", False)),
+                    is_prerequisite=bool(step_data.get("is_prerequisite", False)),
+                    is_rollback_step=bool(step_data.get("is_rollback_step", False)),
+                    validation_command=step_data.get("validation_command"),
+                    rollback_command=step_data.get("rollback_command"),
+                    rollback_description=step_data.get("rollback_description"),
+                    depends_on_steps=step_data.get("depends_on_steps", []),
+                    ai_reasoning=step_data.get("ai_reasoning")
+                )
+                
+                if step_data.get("is_prerequisite"):
+                    prerequisite_steps.append(step_schema)
+                elif step_data.get("is_rollback_step"):
+                    rollback_steps.append(step_schema)
+                else:
+                    main_steps.append(step_schema)
         
         # Sort steps by order
         prerequisite_steps.sort(key=lambda x: x.step_order)

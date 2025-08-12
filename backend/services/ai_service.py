@@ -88,7 +88,7 @@ class AIService:
             
             # Add gpt-oss reasoning prefix if using harmony format
             if self.use_harmony_format:
-                system_prompt = self.settings.get_ai_system_prompt_prefix() + system_prompt
+                system_prompt = f"Reasoning: {self.settings.ai_reasoning_level}\n\n{system_prompt}"
             
             prompt = f"""Please explain this shell command in detail:
 
@@ -309,7 +309,7 @@ Response format (JSON):
         
         # Add gpt-oss reasoning prefix if using harmony format
         if self.use_harmony_format:
-            base_prompt = self.settings.get_ai_system_prompt_prefix() + base_prompt
+            base_prompt = f"Reasoning: {reasoning_level.value}\n\n{base_prompt}"
         
         # Add OS-specific context
         os_context = {

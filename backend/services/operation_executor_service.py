@@ -2,7 +2,7 @@
 Operation execution service for running multi-step operation plans
 """
 
-# type: ignore - Disable type checking for this entire file due to SQLAlchemy integration issues
+# Type-safe operation execution service with proper SQLAlchemy integration
 
 import asyncio
 import logging
@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from backend.models.database import (
-    OperationPlan, OperationStep, OperationExecution, OperationStepExecution
+    OperationPlan, OperationExecution
 )
 from backend.models.schemas import (
     OperationExecutionRequest, OperationExecutionSchema, OperationStepExecutionSchema,
@@ -104,10 +104,8 @@ class OperationExecutorService:
     
     async def get_execution_status(self, execution_id: str) -> Optional[OperationExecutionSchema]:
         """Get current execution status"""
-        # Get execution with related step executions
-        query = select(OperationExecution).options(
-            selectinload(OperationExecution.step_executions)
-        ).where(OperationExecution.id == execution_id)
+        # Get execution record
+        query = select(OperationExecution).where(OperationExecution.id == execution_id)
         
         result = await self.db.execute(query)
         db_execution = result.scalar_one_or_none()
@@ -115,37 +113,33 @@ class OperationExecutorService:
         if not db_execution:
             return None
         
-        # Get step information for all step executions
+        # Parse step executions from JSON data
         step_executions = []
-        for db_step_exec in db_execution.step_executions:
-            # Get the related step information
-            step_query = select(OperationStep).where(OperationStep.id == db_step_exec.step_id)
-            step_result = await self.db.execute(step_query)
-            step = step_result.scalar_one_or_none()
-            
-            step_exec_schema = OperationStepExecutionSchema(
-                id=str(db_step_exec.id),
-                step_id=str(db_step_exec.step_id),
-                step_order=step.step_order if step else 0,
-                step_name=step.name if step else "Unknown Step",
-                status=StepStatus(db_step_exec.status),
-                command_executed=db_step_exec.command_executed,
-                working_directory=db_step_exec.working_directory,
-                stdout=db_step_exec.stdout,
-                stderr=db_step_exec.stderr,
-                exit_code=db_step_exec.exit_code,
-                success=bool(db_step_exec.success) if db_step_exec.success is not None else None,
-                started_at=db_step_exec.started_at,
-                completed_at=db_step_exec.completed_at,
-                execution_time_seconds=float(db_step_exec.execution_time_seconds) if db_step_exec.execution_time_seconds else None,
-                validation_performed=bool(db_step_exec.validation_performed),
-                validation_success=bool(db_step_exec.validation_success) if db_step_exec.validation_success is not None else None,
-                validation_output=db_step_exec.validation_output,
-                user_approved=bool(db_step_exec.user_approved) if db_step_exec.user_approved is not None else None,
-                approval_timestamp=db_step_exec.approval_timestamp,
-                user_notes=db_step_exec.user_notes
-            )
-            step_executions.append(step_exec_schema)
+        if db_execution.step_results_json:
+            for step_data in db_execution.step_results_json:
+                step_exec_schema = OperationStepExecutionSchema(
+                    id=step_data.get("id", str(uuid.uuid4())),
+                    step_id=step_data.get("step_id", ""),
+                    step_order=int(step_data.get("step_order", 0)),
+                    step_name=step_data.get("step_name", "Unknown Step"),
+                    status=StepStatus(step_data.get("status", "pending")),
+                    command_executed=step_data.get("command_executed"),
+                    working_directory=step_data.get("working_directory"),
+                    stdout=step_data.get("stdout"),
+                    stderr=step_data.get("stderr"),
+                    exit_code=step_data.get("exit_code"),
+                    success=bool(step_data.get("success")) if step_data.get("success") is not None else None,
+                    started_at=step_data.get("started_at"),
+                    completed_at=step_data.get("completed_at"),
+                    execution_time_seconds=float(step_data.get("execution_time_seconds")) if step_data.get("execution_time_seconds") else None,
+                    validation_performed=bool(step_data.get("validation_performed", False)),
+                    validation_success=bool(step_data.get("validation_success")) if step_data.get("validation_success") is not None else None,
+                    validation_output=step_data.get("validation_output"),
+                    user_approved=bool(step_data.get("user_approved")) if step_data.get("user_approved") is not None else None,
+                    approval_timestamp=step_data.get("approval_timestamp"),
+                    user_notes=step_data.get("user_notes")
+                )
+                step_executions.append(step_exec_schema)
         
         # Create execution schema
         return OperationExecutionSchema(
@@ -263,43 +257,48 @@ class OperationExecutorService:
     
     async def approve_step(self, request: StepApprovalRequest) -> bool:
         """Approve a step that requires approval"""
-        # Find the step execution
-        query = select(OperationStepExecution).where(
-            OperationStepExecution.execution_id == request.execution_id,
-            OperationStepExecution.step_id == request.step_id
-        )
-        
+        # Get execution record
+        query = select(OperationExecution).where(OperationExecution.id == request.execution_id)
         result = await self.db.execute(query)
-        step_execution = result.scalar_one_or_none()
+        execution = result.scalar_one_or_none()
         
-        if not step_execution:
+        if not execution:
             return False
         
-        # Update approval status using update statement
-        update_stmt = update(OperationStepExecution).where(
-            OperationStepExecution.id == step_execution.id
-        ).values(
-            user_approved=request.approved,
-            approval_timestamp=datetime.utcnow(),
-            user_notes=request.user_notes,
-            status=StepStatus.PENDING.value if request.approved else StepStatus.SKIPPED.value
-        )
+        # Update step approval in JSON data
+        if execution.step_results_json:
+            updated_steps = []
+            step_found = False
+            
+            for step_data in execution.step_results_json:
+                if step_data.get("step_id") == request.step_id:
+                    step_data["user_approved"] = request.approved
+                    step_data["approval_timestamp"] = datetime.utcnow().isoformat()
+                    step_data["user_notes"] = request.user_notes
+                    step_data["status"] = StepStatus.PENDING.value if request.approved else StepStatus.SKIPPED.value
+                    step_found = True
+                updated_steps.append(step_data)
+            
+            if step_found:
+                # Update execution record with modified JSON
+                await self._update_execution_fields(request.execution_id, {
+                    "step_results_json": updated_steps
+                })
+                
+                await self._log_execution_event(
+                    request.execution_id, 
+                    ExecutionEventType.STEP_APPROVED,
+                    {
+                        "step_id": request.step_id,
+                        "approved": request.approved,
+                        "user_notes": request.user_notes
+                    }
+                )
+                
+                logger.info(f"Step {request.step_id} {'approved' if request.approved else 'rejected'}")
+                return True
         
-        await self.db.execute(update_stmt)
-        await self.db.commit()
-        
-        await self._log_execution_event(
-            request.execution_id, 
-            ExecutionEventType.STEP_APPROVED,
-            {
-                "step_id": request.step_id,
-                "approved": request.approved,
-                "user_notes": request.user_notes
-            }
-        )
-        
-        logger.info(f"Step {request.step_id} {'approved' if request.approved else 'rejected'}")
-        return True
+        return False
     
     async def rollback_execution(self, execution_id: str) -> bool:
         """Rollback a failed or completed execution"""
@@ -485,18 +484,32 @@ class OperationExecutorService:
         if not plan:
             raise Exception("Plan record not found")
         
-        # Create step execution record
-        db_step_execution = OperationStepExecution(
-            id=step_exec_id,
-            execution_id=execution_id,
-            step_id=step.id if step.id else str(uuid.uuid4()),
-            status=StepStatus.PENDING.value,
-            command_executed=step.command,
-            working_directory=step.working_directory
-        )
+        # Create step execution data for JSON storage
+        step_execution_data = {
+            "id": step_exec_id,
+            "step_id": step.id if step.id else str(uuid.uuid4()),
+            "step_order": step.step_order,
+            "step_name": step.name,
+            "status": StepStatus.PENDING.value,
+            "command_executed": step.command,
+            "working_directory": step.working_directory,
+            "started_at": None,
+            "completed_at": None,
+            "execution_time_seconds": None,
+            "stdout": None,
+            "stderr": None,
+            "exit_code": None,
+            "success": None,
+            "validation_performed": False,
+            "validation_success": None,
+            "validation_output": None,
+            "user_approved": None,
+            "approval_timestamp": None,
+            "user_notes": None
+        }
         
-        self.db.add(db_step_execution)
-        await self.db.commit()
+        # Add step to execution JSON data
+        await self._add_step_execution_to_json(execution_id, step_execution_data)
         
         await self._log_execution_event(
             execution_id, 
@@ -508,9 +521,8 @@ class OperationExecutorService:
             # Check if step requires approval
             if step.requires_approval and not auto_approve:
                 # Mark as requiring approval
-                await self._update_step_execution_fields(step_exec_id, {
-                    "status": StepStatus.REQUIRES_APPROVAL.value
-                })
+                step_execution_data["status"] = StepStatus.REQUIRES_APPROVAL.value
+                await self._update_step_execution_in_json(execution_id, step_exec_id, step_execution_data)
                 
                 await self._log_execution_event(
                     execution_id,
@@ -520,17 +532,17 @@ class OperationExecutorService:
                 
                 # For now, skip the step if it requires approval
                 logger.info(f"Step {step.step_order} requires approval - marking as skipped")
-                await self._update_step_execution_fields(step_exec_id, {
-                    "status": StepStatus.SKIPPED.value
-                })
+                step_execution_data["status"] = StepStatus.SKIPPED.value
+                await self._update_step_execution_in_json(execution_id, step_exec_id, step_execution_data)
                 return True
             
             # Update step status to running
             start_time = datetime.utcnow()
-            await self._update_step_execution_fields(step_exec_id, {
+            step_execution_data.update({
                 "status": StepStatus.RUNNING.value,
-                "started_at": start_time
+                "started_at": start_time.isoformat()
             })
+            await self._update_step_execution_in_json(execution_id, step_exec_id, step_execution_data)
             
             # Map execution mode to safety level
             safety_level_map = {
@@ -554,15 +566,15 @@ class OperationExecutorService:
             completed_at = datetime.utcnow()
             execution_time = (completed_at - start_time).total_seconds()
             
-            # Prepare update data
-            step_update_data = {
+            # Update step execution data
+            step_execution_data.update({
                 "stdout": result.get("stdout", ""),
                 "stderr": result.get("stderr", ""),
                 "exit_code": result.get("exit_code", 0),
                 "success": result.get("success", False),
-                "completed_at": completed_at,
+                "completed_at": completed_at.isoformat(),
                 "execution_time_seconds": execution_time
-            }
+            })
             
             # Perform validation if specified
             if step.validation_command and result.get("success", False):
@@ -575,7 +587,7 @@ class OperationExecutorService:
                 )
                 
                 validation_success = validation_result.get("success", False)
-                step_update_data.update({
+                step_execution_data.update({
                     "validation_performed": True,
                     "validation_success": validation_success,
                     "validation_output": validation_result.get("stdout", "")
@@ -583,43 +595,43 @@ class OperationExecutorService:
                 
                 # Update overall success based on validation
                 if not validation_success:
-                    step_update_data["success"] = False
+                    step_execution_data["success"] = False
             
             # Update final status
-            if step_update_data["success"]:
-                step_update_data["status"] = StepStatus.COMPLETED.value
+            if step_execution_data["success"]:
+                step_execution_data["status"] = StepStatus.COMPLETED.value
                 await self._log_execution_event(
                     execution_id,
                     ExecutionEventType.STEP_COMPLETED,
                     {"step_order": step.step_order, "step_name": step.name}
                 )
             else:
-                step_update_data["status"] = StepStatus.FAILED.value
+                step_execution_data["status"] = StepStatus.FAILED.value
                 await self._log_execution_event(
                     execution_id,
                     ExecutionEventType.STEP_FAILED,
                     {
                         "step_order": step.step_order, 
                         "step_name": step.name,
-                        "error": step_update_data["stderr"]
+                        "error": step_execution_data["stderr"]
                     }
                 )
             
-            await self._update_step_execution_fields(step_exec_id, step_update_data)
-            return bool(step_update_data["success"])
+            await self._update_step_execution_in_json(execution_id, step_exec_id, step_execution_data)
+            return bool(step_execution_data["success"])
             
         except Exception as e:
             logger.error(f"Step execution failed: {e}")
             
             # Update step execution with error
-            error_update_data = {
+            step_execution_data.update({
                 "status": StepStatus.FAILED.value,
                 "stderr": str(e),
                 "success": False,
-                "completed_at": datetime.utcnow()
-            }
+                "completed_at": datetime.utcnow().isoformat()
+            })
             
-            await self._update_step_execution_fields(step_exec_id, error_update_data)
+            await self._update_step_execution_in_json(execution_id, step_exec_id, step_execution_data)
             
             await self._log_execution_event(
                 execution_id,
@@ -669,15 +681,26 @@ class OperationExecutorService:
                         safety_level=SafetyLevel.CAUTIOUS
                     )
                     
-                    # Update step execution with rollback info - using explicit field names
-                    rollback_data = {
-                        "rollback_executed": True,
-                        "rollback_success": result.get("success", False),
-                        "rollback_output": result.get("stdout", "")
-                    }
+                    # Update step execution with rollback info in JSON
+                    # Find and update the step in JSON data
+                    query = select(OperationExecution).where(OperationExecution.id == execution_id)
+                    exec_result = await self.db.execute(query)
+                    exec_record = exec_result.scalar_one_or_none()
                     
-                    # Note: These fields need to exist in the database model
-                    await self._update_step_execution_fields(step_exec.id, rollback_data)
+                    if exec_record and exec_record.step_results_json:
+                        updated_steps = []
+                        for step_json in exec_record.step_results_json:
+                            if step_json.get("step_id") == step_exec.step_id:
+                                step_json.update({
+                                    "rollback_executed": True,
+                                    "rollback_success": result.get("success", False),
+                                    "rollback_output": result.get("stdout", "")
+                                })
+                            updated_steps.append(step_json)
+                        
+                        await self._update_execution_fields(execution_id, {
+                            "step_results_json": updated_steps
+                        })
                     
                     if not result.get("success", False):
                         rollback_success = False
@@ -716,14 +739,37 @@ class OperationExecutorService:
         await self.db.execute(update_stmt)
         await self.db.commit()
     
-    async def _update_step_execution_fields(self, step_exec_id: str, fields: Dict[str, Any]):
-        """Update step execution fields in database"""
-        update_stmt = update(OperationStepExecution).where(
-            OperationStepExecution.id == step_exec_id
-        ).values(**fields)
+    async def _add_step_execution_to_json(self, execution_id: str, step_data: Dict[str, Any]) -> None:
+        """Add step execution data to JSON field"""
+        query = select(OperationExecution).where(OperationExecution.id == execution_id)
+        result = await self.db.execute(query)
+        execution = result.scalar_one_or_none()
         
-        await self.db.execute(update_stmt)
-        await self.db.commit()
+        if execution:
+            current_steps = execution.step_results_json or []
+            current_steps.append(step_data)
+            
+            await self._update_execution_fields(execution_id, {
+                "step_results_json": current_steps
+            })
+    
+    async def _update_step_execution_in_json(self, execution_id: str, step_exec_id: str, step_data: Dict[str, Any]) -> None:
+        """Update step execution data in JSON field"""
+        query = select(OperationExecution).where(OperationExecution.id == execution_id)
+        result = await self.db.execute(query)
+        execution = result.scalar_one_or_none()
+        
+        if execution and execution.step_results_json:
+            updated_steps = []
+            for existing_step in execution.step_results_json:
+                if existing_step.get("id") == step_exec_id:
+                    updated_steps.append(step_data)
+                else:
+                    updated_steps.append(existing_step)
+            
+            await self._update_execution_fields(execution_id, {
+                "step_results_json": updated_steps
+            })
     
     async def _log_execution_event(
         self, 

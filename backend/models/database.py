@@ -31,7 +31,6 @@ class Server(Base):
     
     # Relationships
     command_history = relationship("CommandHistory", back_populates="server", cascade="all, delete-orphan")
-    terminal_sessions = relationship("TerminalSession", back_populates="server", cascade="all, delete-orphan")
 
 
 class User(Base):
@@ -51,7 +50,6 @@ class User(Base):
     
     # Relationships
     command_history = relationship("CommandHistory", back_populates="user")
-    terminal_sessions = relationship("TerminalSession", back_populates="user")
 
 
 class CommandHistory(Base):
@@ -81,87 +79,8 @@ class CommandHistory(Base):
     user = relationship("User", back_populates="command_history")
 
 
-class TerminalSession(Base):
-    """Active terminal sessions"""
-    __tablename__ = "terminal_sessions"
-    
-    id = Column(String, primary_key=True)
-    session_token = Column(String(255), unique=True, nullable=False, index=True)
-    working_directory = Column(String(500), default="/", nullable=False)
-    environment_vars = Column(Text, nullable=True)  # JSON string
-    is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Connection details
-    connection_id = Column(String(255), nullable=True)  # SSH connection identifier
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    last_activity = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    closed_at = Column(DateTime, nullable=True)
-    
-    # Relationships
-    server_id = Column(String, ForeignKey("servers.id"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    
-    server = relationship("Server", back_populates="terminal_sessions")
-    user = relationship("User", back_populates="terminal_sessions")
-
-
-class AIModel(Base):
-    """AI model configurations"""
-    __tablename__ = "ai_models"
-    
-    id = Column(String, primary_key=True)
-    name = Column(String(100), unique=True, nullable=False)
-    provider = Column(String(50), nullable=False)  # ollama, transformers, etc.
-    model_path = Column(String(500), nullable=True)
-    config = Column(Text, nullable=True)  # JSON configuration
-    
-    is_active = Column(Boolean, default=False, nullable=False)
-    is_available = Column(Boolean, default=False, nullable=False)
-    
-    # Performance metrics
-    avg_response_time = Column(Float, nullable=True)
-    total_requests = Column(Integer, default=0, nullable=False)
-    success_rate = Column(Float, nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
-
-
-class ServerSnapshot(Base):
-    """Periodic server state snapshots"""
-    __tablename__ = "server_snapshots"
-    
-    id = Column(String, primary_key=True)
-    server_id = Column(String, ForeignKey("servers.id"), nullable=False)
-    
-    # System information
-    hostname = Column(String(255), nullable=True)
-    os_version = Column(String(100), nullable=True)
-    kernel_version = Column(String(100), nullable=True)
-    architecture = Column(String(50), nullable=True)
-    
-    # Performance metrics
-    cpu_percent = Column(Float, nullable=True)
-    memory_percent = Column(Float, nullable=True)
-    disk_percent = Column(Float, nullable=True)
-    load_average = Column(String(100), nullable=True)  # "1.0,1.2,1.1"
-    uptime_seconds = Column(Integer, nullable=True)
-    
-    # Software information
-    installed_packages = Column(Text, nullable=True)  # JSON array
-    running_services = Column(Text, nullable=True)  # JSON array
-    open_ports = Column(Text, nullable=True)  # JSON array
-    
-    # Security
-    failed_login_attempts = Column(Integer, default=0, nullable=False)
-    last_package_update = Column(DateTime, nullable=True)
-    
-    captured_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    
-    # Relationship
-    server = relationship("Server")
+# Removed TerminalSession, AIModel, and ServerSnapshot classes
+# These tables are dropped in the schema simplification
 
 
 class AuditLog(Base):
@@ -215,53 +134,19 @@ class OperationPlan(Base):
     # Plan status
     status = Column(String(50), default="draft", nullable=False)  # draft, approved, executing, completed, failed, rolled_back
     
+    # JSON fields to replace separate tables
+    steps_json = Column(JSON, nullable=True)  # Consolidated steps data
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
     # Relationships
     server = relationship("Server")
-    steps = relationship("OperationStep", back_populates="plan", cascade="all, delete-orphan", order_by="OperationStep.step_order")
     executions = relationship("OperationExecution", back_populates="plan", cascade="all, delete-orphan")
 
 
-class OperationStep(Base):
-    """Individual steps within an operation plan"""
-    __tablename__ = "operation_steps"
-    
-    id = Column(String, primary_key=True)
-    plan_id = Column(String, ForeignKey("operation_plans.id"), nullable=False)
-    
-    # Step details
-    step_order = Column(Integer, nullable=False)
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    command = Column(Text, nullable=False)
-    working_directory = Column(String(500), nullable=True)
-    
-    # Step metadata
-    estimated_duration_seconds = Column(Integer, nullable=True)
-    risk_level = Column(String(20), nullable=False)
-    requires_approval = Column(Boolean, default=False, nullable=False)
-    is_prerequisite = Column(Boolean, default=False, nullable=False)
-    is_rollback_step = Column(Boolean, default=False, nullable=False)
-    
-    # Validation and rollback
-    validation_command = Column(Text, nullable=True)  # Command to verify step success
-    rollback_command = Column(Text, nullable=True)   # Command to undo this step
-    rollback_description = Column(Text, nullable=True)
-    
-    # Dependencies
-    depends_on_steps = Column(JSON, nullable=True)  # List of step IDs this depends on
-    
-    # AI reasoning
-    ai_reasoning = Column(Text, nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    
-    # Relationships
-    plan = relationship("OperationPlan", back_populates="steps")
-    step_executions = relationship("OperationStepExecution", back_populates="step", cascade="all, delete-orphan")
+# OperationStep class removed - data consolidated into OperationPlan.steps_json
 
 
 class OperationExecution(Base):
@@ -297,87 +182,16 @@ class OperationExecution(Base):
     # Execution log
     execution_log = Column(JSON, nullable=True)  # Detailed log of execution events
     
+    # JSON fields to replace separate tables
+    step_results_json = Column(JSON, nullable=True)  # Consolidated step execution results
+    
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
     # Relationships
     plan = relationship("OperationPlan", back_populates="executions")
-    step_executions = relationship("OperationStepExecution", back_populates="execution", cascade="all, delete-orphan")
 
 
-class OperationStepExecution(Base):
-    """Execution results for individual steps"""
-    __tablename__ = "operation_step_executions"
-    
-    id = Column(String, primary_key=True)
-    execution_id = Column(String, ForeignKey("operation_executions.id"), nullable=False)
-    step_id = Column(String, ForeignKey("operation_steps.id"), nullable=False)
-    
-    # Execution details
-    status = Column(String(50), default="pending", nullable=False)  # pending, running, completed, failed, skipped, requires_approval
-    command_executed = Column(Text, nullable=True)  # Actual command that was run
-    working_directory = Column(String(500), nullable=True)
-    
-    # Results
-    stdout = Column(Text, nullable=True)
-    stderr = Column(Text, nullable=True)
-    exit_code = Column(Integer, nullable=True)
-    success = Column(Boolean, nullable=True)
-    
-    # Timing
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    execution_time_seconds = Column(Float, nullable=True)
-    
-    # Validation
-    validation_performed = Column(Boolean, default=False, nullable=False)
-    validation_success = Column(Boolean, nullable=True)
-    validation_output = Column(Text, nullable=True)
-    
-    # Rollback info
-    rollback_executed = Column(Boolean, default=False, nullable=False)
-    rollback_success = Column(Boolean, nullable=True)
-    rollback_output = Column(Text, nullable=True)
-    
-    # User interaction
-    user_approved = Column(Boolean, nullable=True)
-    approval_timestamp = Column(DateTime, nullable=True)
-    user_notes = Column(Text, nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
-    
-    # Relationships
-    execution = relationship("OperationExecution", back_populates="step_executions")
-    step = relationship("OperationStep", back_populates="step_executions")
-
-
-class OperationTemplate(Base):
-    """Reusable operation templates"""
-    __tablename__ = "operation_templates"
-    
-    id = Column(String, primary_key=True)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(Text, nullable=True)
-    category = Column(String(100), nullable=False)  # web_server, database, security, etc.
-    
-    # Template data
-    operation_type = Column(String(50), nullable=False)
-    template_data = Column(JSON, nullable=False)  # Serialized plan structure
-    
-    # Metadata
-    os_compatibility = Column(JSON, nullable=True)  # List of compatible OS types
-    min_requirements = Column(JSON, nullable=True)  # Minimum system requirements
-    tags = Column(JSON, nullable=True)  # Search tags
-    
-    # Usage statistics
-    usage_count = Column(Integer, default=0, nullable=False)
-    success_rate = Column(Float, nullable=True)
-    avg_execution_time = Column(Float, nullable=True)
-    
-    # Template status
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_verified = Column(Boolean, default=False, nullable=False)
-    
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+# OperationStepExecution and OperationTemplate classes removed
+# Data consolidated into OperationExecution.step_results_json
+# Templates are not essential for core functionality
