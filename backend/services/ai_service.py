@@ -289,22 +289,19 @@ Provide your response in JSON format:
     ) -> str:
         """Build system prompt with context"""
         
-        base_prompt = """You are an expert Linux system administrator assistant. 
-Your job is to generate safe, accurate shell commands based on natural language requests.
+        base_prompt = """You are a Linux system administrator. Generate safe shell commands.
 
-IMPORTANT RULES:
-1. Always provide safe commands - never suggest anything destructive
-2. Explain what the command does
-3. Warn about any potential risks
-4. Suggest alternatives when appropriate
-5. Use the most appropriate command for the target OS
+CRITICAL INSTRUCTIONS:
+1. Respond with ONLY valid JSON
+2. NO markdown code blocks (```json)
+3. NO comments in JSON
+4. Use this exact format:
 
-Response format (JSON):
 {
-    "command": "the actual shell command",
-    "explanation": "clear explanation of what it does",
-    "reasoning": "step-by-step thinking process",
-    "alternatives": ["alternative command 1", "alternative command 2"]
+    "command": "shell command here",
+    "explanation": "what it does",
+    "reasoning": "your thinking as one string",
+    "alternatives": ["cmd1", "cmd2"]
 }"""
         
         # Add gpt-oss reasoning prefix if using harmony format
@@ -342,63 +339,95 @@ Server Context:
     ) -> str:
         """Build the full prompt for command generation"""
         
-        prompt = f"Please generate a shell command for the following request:\n\n{user_prompt}\n\n"
+        prompt = f"""Generate a shell command for: {user_prompt}
+
+CRITICAL: Respond with ONLY a JSON object. NO markdown code blocks, NO extra text.
+
+Required format:
+{{
+    "command": "exact shell command",
+    "explanation": "what it does",
+    "reasoning": "your thinking process",
+    "alternatives": ["alt1", "alt2"]
+}}
+
+Do NOT use ```json blocks. Return raw JSON only."""
         
         if server_context:
-            prompt += "Please consider the server context provided in the system message.\n\n"
-        
-        prompt += """Please respond with a JSON object containing:
-- command: the exact shell command to run
-- explanation: what the command does
-- reasoning: your step-by-step thinking
-- alternatives: other ways to accomplish the same task
-
-Ensure the command is safe and appropriate for the target system."""
+            prompt += f"\n\nServer: {server_context.get('os_type', 'linux')}"
         
         return prompt
     
     def _parse_command_response(self, response: str) -> Dict[str, Any]:
-        """Parse AI response for command generation"""
+        """Parse AI response for command generation - Fixed version"""
         try:
-            # Handle gpt-oss chain of thought output
-            if self.use_harmony_format and "<thinking>" in response:
-                # Extract JSON from gpt-oss thinking tags
+            logger.debug(f"Parsing AI response: {response[:500]}...")
+            
+            # Handle gpt-oss chain of thought output with markdown
+            if "```json" in response:
+                # Extract JSON content from markdown blocks
                 import re
                 json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(1)
-                    return json.loads(json_str)
+                    # Clean up comments and extra whitespace
+                    json_str = re.sub(r'//.*', '', json_str)  # Remove // comments
+                    json_str = re.sub(r'\s*//.*', '', json_str)  # Remove inline comments
+                    parsed = json.loads(json_str)
+                    
+                    # Fix reasoning field if it's a list
+                    if isinstance(parsed.get("reasoning"), list):
+                        parsed["reasoning"] = "\n".join(str(item) for item in parsed["reasoning"])
+                    
+                    return parsed
             
-            # Try to extract JSON from response
+            # Handle gpt-oss chain of thought output with thinking tags
+            if self.use_harmony_format and "<thinking>" in response:
+                import re
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                    parsed = json.loads(json_str)
+                    # Ensure reasoning is a string
+                    if isinstance(parsed.get("reasoning"), list):
+                        parsed["reasoning"] = "\n".join(str(item) for item in parsed["reasoning"])
+                    return parsed
+            
+            # Try to extract JSON from response without markdown
             start_idx = response.find('{')
             end_idx = response.rfind('}') + 1
             
             if start_idx != -1 and end_idx != 0:
                 json_str = response[start_idx:end_idx]
-                return json.loads(json_str)
-            else:
-                # Fallback: try to parse the whole response as JSON
-                return json.loads(response)
+                parsed = json.loads(json_str)
                 
-        except json.JSONDecodeError:
-            # Fallback: extract command manually
-            lines = response.strip().split('\n')
-            command = ""
-            explanation = response
+                # Fix reasoning field if it's a list
+                if isinstance(parsed.get("reasoning"), list):
+                    parsed["reasoning"] = "\n".join(str(item) for item in parsed["reasoning"])
+                
+                return parsed
+                
+        except Exception as e:
+            logger.error(f"JSON parsing failed: {e}")
             
-            # Look for command patterns
+            # Enhanced fallback: extract command manually
+            lines = [line.strip() for line in response.strip().split('\n') if line.strip()]
+            command = "echo 'Could not parse command'"
+            
+            # Look for actual commands in the response
             for line in lines:
-                line = line.strip()
-                if line.startswith('```') or line.startswith('$') or line.startswith('#'):
-                    continue
-                if line and not line.startswith('The') and not line.startswith('This'):
-                    command = line.split()[0] if line.split() else ""
-                    break
+                if '"command":' in line:
+                    # Extract command value
+                    import re
+                    match = re.search(r'"command":\s*"([^"]*)"', line)
+                    if match:
+                        command = match.group(1)
+                        break
             
             return {
-                "command": command or "echo 'Could not parse command'",
-                "explanation": explanation,
-                "reasoning": "Fallback parsing used",
+                "command": command,
+                "explanation": "Command extracted from malformed AI response",
+                "reasoning": "Fallback parsing used due to JSON parsing error",
                 "alternatives": []
             }
     

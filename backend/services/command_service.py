@@ -13,7 +13,7 @@ from backend.config.settings import get_settings
 from backend.models.database import CommandHistory, Server
 from backend.models.schemas import SafetyLevel, CommandResponse
 from backend.services.ai_service import AIService
-from backend.core.ssh_manager import SSHManager
+from backend.core.ssh_manager import ssh_factory
 from backend.core.exceptions import ServiceError, ValidationError, ExternalServiceError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -28,7 +28,6 @@ class CommandService:
         self.db = db
         self.settings = get_settings()
         self.ai_service = AIService()
-        self.ssh_manager = SSHManager()
     
     async def execute_natural_command(
         self, 
@@ -47,14 +46,40 @@ class CommandService:
             
             # Generate command using AI
             logger.info(f"Generating command for prompt: {prompt}")
-            ai_response = await self.ai_service.generate_command(
-                prompt=prompt,
-                server_context={
-                    "hostname": server.hostname,
-                    "os_type": server.os_type,
-                    "username": server.username
+            try:
+                ai_response = await self.ai_service.generate_command(
+                    prompt=prompt,
+                    server_context={
+                        "hostname": server.hostname,
+                        "os_type": server.os_type,
+                        "username": server.username
+                    }
+                )
+                
+                # Validate that we got a proper command
+                if not ai_response.command or ai_response.command.startswith('{'):
+                    logger.error(f"AI returned malformed command: {ai_response.command}")
+                    return {
+                        "success": False,
+                        "command": "echo 'AI parsing error'",
+                        "explanation": "AI returned malformed response",
+                        "error": "AI response parsing failed",
+                        "execution_time": 0.0,
+                        "safety_level": safety_level.value,
+                        "warnings": ["AI response parsing failed"]
+                    }
+                    
+            except Exception as ai_error:
+                logger.error(f"AI command generation failed: {ai_error}")
+                return {
+                    "success": False,
+                    "command": "echo 'AI service error'",
+                    "explanation": f"AI service error: {str(ai_error)}",
+                    "error": f"Failed to generate command: {str(ai_error)}",
+                    "execution_time": 0.0,
+                    "safety_level": safety_level.value,
+                    "warnings": ["AI service unavailable"]
                 }
-            )
             
             # Validate safety level
             if not self._is_safety_acceptable(ai_response.risk_level, safety_level):
@@ -136,23 +161,37 @@ class CommandService:
             logger.info(f"Executing command on {server.hostname}: {command}")
             
             try:
-                result = await self.ssh_manager.execute_command(
-                    server_id=server_id,
+                # Get SSH manager for this server
+                ssh_manager = await ssh_factory.get_manager(server_id)
+                
+                # Connect to server if not already connected
+                if not ssh_manager.is_connected():
+                    server_data = {
+                        "hostname": server.hostname,
+                        "username": server.username,
+                        "password": server.password,  # This should be encrypted in the database
+                        "port": server.port,
+                        "timeout": self.settings.ssh_timeout
+                    }
+                    await ssh_factory.connect_to_server(server_id, server_data)
+                
+                # Execute command with correct parameters
+                result = await ssh_manager.execute_command(
                     command=command,
                     timeout=self.settings.ssh_timeout
                 )
                 
                 execution_time = time.time() - start_time
-                success = result.get("exit_code", 1) == 0
+                success = result.exit_code == 0
                 
                 # Log to command history
                 await self._log_command_history(
                     server_id=server_id,
                     user_id=user_id,
                     command=command,
-                    output=result.get("stdout", ""),
-                    error=result.get("stderr", ""),
-                    exit_code=result.get("exit_code", 1),
+                    output=result.stdout,
+                    error=result.stderr,
+                    exit_code=result.exit_code,
                     execution_time=execution_time,
                     ai_prompt=ai_prompt,
                     ai_reasoning=ai_reasoning,
@@ -163,12 +202,12 @@ class CommandService:
                     "success": success,
                     "command": command,
                     "explanation": explanation or validation.explanation,
-                    "output": result.get("stdout", ""),
-                    "error": result.get("stderr", "") if not success else None,
+                    "output": result.stdout,
+                    "error": result.stderr if not success else None,
                     "execution_time": execution_time,
                     "safety_level": safety_level.value,
                     "warnings": (warnings or []) + validation.warnings,
-                    "exit_code": result.get("exit_code", 1)
+                    "exit_code": result.exit_code
                 }
                 
             except Exception as ssh_error:

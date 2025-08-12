@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="change-in-production", description="Secret key for security")
     database_url: str = Field(default="sqlite+aiosqlite:///./data/nexus.db", description="Database URL")
     
-    # AI - gpt-oss specific settings (4 essential settings)
+    # AI - gpt-oss specific settings (5 essential settings)
+    ai_provider: str = Field(default="ollama", description="AI provider name")
     ollama_base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
     ai_model_name: str = Field(default="gpt-oss:20b", description="AI model to use")
     ai_timeout: int = Field(default=120, description="AI request timeout in seconds")
@@ -57,3 +58,8 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get application settings (cached)"""
     return Settings()
+
+# Clear cache function for development
+def clear_settings_cache():
+    """Clear the settings cache"""
+    get_settings.cache_clear()
