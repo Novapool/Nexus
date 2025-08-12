@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 import logging
 import sys
 from pathlib import Path
@@ -81,24 +81,22 @@ def create_application() -> FastAPI:
     # Include all API routes under /api/v1
     app.include_router(api_router, prefix="/api/v1")
     
-    # Add a simple root endpoint
-    @app.get("/")
-    async def root():
-        return {"message": "Nexus Server Management API", "docs": "/docs", "health": "/health"}
-    
-    # Serve static files (frontend) - but don't mount at root to avoid conflicts
+    # Serve the frontend at root
     if settings.serve_static:
         try:
+            # Serve the frontend at root
+            frontend_file = project_root / "frontend" / "index.html"
+            if frontend_file.exists():
+                @app.get("/", response_class=HTMLResponse)
+                async def serve_frontend():
+                    return frontend_file.read_text(encoding='utf-8')
+            
+            # Serve other static files
             static_dir = project_root / "frontend" / "static"
             if static_dir.exists():
                 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-            
-            # Don't mount frontend at root - it conflicts with API routes
-            # frontend_dir = project_root / "frontend"
-            # if frontend_dir.exists():
-            #     app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
         except Exception as e:
-            logger.warning(f"Could not mount static files: {e}")
+            logger.warning(f"Could not mount frontend: {e}")
     
     return app
 
