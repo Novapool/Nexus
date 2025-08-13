@@ -65,15 +65,15 @@ class CommandHistory(Base):
     working_directory = Column(String(500), nullable=True)
     
     # AI-related fields
-    is_ai_generated = Column(Boolean, default=False, nullable=False)
+    is_ai_generated = Column(Boolean, default=False, nullable=False, index=True)
     ai_prompt = Column(Text, nullable=True)  # Original natural language prompt
     ai_reasoning = Column(Text, nullable=True)  # AI reasoning process
-    risk_level = Column(String(20), nullable=True)
+    risk_level = Column(String(20), nullable=True, index=True)
     
     # Relationships
-    server_id = Column(String, ForeignKey("servers.id"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    executed_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    server_id = Column(String, ForeignKey("servers.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    executed_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
     
     server = relationship("Server", back_populates="command_history")
     user = relationship("User", back_populates="command_history")
@@ -118,13 +118,13 @@ class OperationPlan(Base):
     user_prompt = Column(Text, nullable=False)  # Original user request
     
     # Plan metadata
-    operation_type = Column(String(50), nullable=False)  # simple, complex, advanced
+    operation_type = Column(String(50), nullable=False, index=True)  # simple, complex, advanced
     estimated_duration_seconds = Column(Integer, nullable=True)
-    risk_level = Column(String(20), nullable=False)  # safe, low, medium, high, dangerous
+    risk_level = Column(String(20), nullable=False, index=True)  # safe, low, medium, high, dangerous
     requires_approval = Column(Boolean, default=False, nullable=False)
     
     # Target server
-    server_id = Column(String, ForeignKey("servers.id"), nullable=False)
+    server_id = Column(String, ForeignKey("servers.id"), nullable=False, index=True)
     
     # AI generation metadata
     ai_model_used = Column(String(100), nullable=True)
@@ -132,13 +132,13 @@ class OperationPlan(Base):
     generation_time_seconds = Column(Float, nullable=True)
     
     # Plan status
-    status = Column(String(50), default="draft", nullable=False)  # draft, approved, executing, completed, failed, rolled_back
+    status = Column(String(50), default="draft", nullable=False, index=True)  # draft, approved, executing, completed, failed, rolled_back
     
     # JSON fields to replace separate tables
     steps_json = Column(JSON, nullable=True)  # Consolidated steps data
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
     # Relationships
@@ -154,22 +154,22 @@ class OperationExecution(Base):
     __tablename__ = "operation_executions"
     
     id = Column(String, primary_key=True)
-    plan_id = Column(String, ForeignKey("operation_plans.id"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    plan_id = Column(String, ForeignKey("operation_plans.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     
     # Execution metadata
     execution_mode = Column(String(20), nullable=False)  # dry_run, safe, cautious, full
     auto_approve = Column(Boolean, default=False, nullable=False)
     
     # Status tracking
-    status = Column(String(50), default="pending", nullable=False)  # pending, running, paused, completed, failed, rolled_back, cancelled
+    status = Column(String(50), default="pending", nullable=False, index=True)  # pending, running, paused, completed, failed, rolled_back, cancelled
     current_step_order = Column(Integer, nullable=True)
     total_steps = Column(Integer, nullable=False)
     completed_steps = Column(Integer, default=0, nullable=False)
     failed_steps = Column(Integer, default=0, nullable=False)
     
     # Timing
-    started_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True, index=True)
     completed_at = Column(DateTime, nullable=True)
     total_execution_time_seconds = Column(Float, nullable=True)
     
@@ -185,7 +185,7 @@ class OperationExecution(Base):
     # JSON fields to replace separate tables
     step_results_json = Column(JSON, nullable=True)  # Consolidated step execution results
     
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
     # Relationships

@@ -15,6 +15,7 @@ from backend.models.schemas import SafetyLevel, CommandResponse
 from backend.services.ai_service import AIService
 from backend.core.ssh_manager import ssh_factory
 from backend.core.exceptions import ServiceError, ValidationError, ExternalServiceError
+from backend.core.safety_validator import SafetyValidator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -343,29 +344,8 @@ class CommandService:
             return None
     
     def _is_safety_acceptable(self, risk_level, safety_level: SafetyLevel) -> bool:
-        """Check if command risk level is acceptable for given safety level"""
-        
-        # Define risk level hierarchy (lower number = safer)
-        risk_hierarchy = {
-            "safe": 0,
-            "low": 1,
-            "medium": 2,
-            "high": 3,
-            "dangerous": 4
-        }
-        
-        safety_limits = {
-            SafetyLevel.PERMISSIVE: 4,  # Allow dangerous
-            SafetyLevel.NORMAL: 3,      # Allow high risk
-            SafetyLevel.CAUTIOUS: 2,    # Allow medium risk
-            SafetyLevel.SAFE: 1,        # Allow low risk only
-            SafetyLevel.PARANOID: 0     # Allow safe only
-        }
-        
-        command_risk = risk_hierarchy.get(risk_level.value if hasattr(risk_level, 'value') else str(risk_level), 4)
-        max_allowed_risk = safety_limits.get(safety_level, 0)
-        
-        return command_risk <= max_allowed_risk
+        """Check if command risk level is acceptable for given safety level using centralized validator"""
+        return SafetyValidator.is_safety_acceptable(risk_level, safety_level)
     
     async def _log_command_history(
         self,
