@@ -6,24 +6,15 @@ import asyncio
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
-from enum import Enum
 import asyncssh
 from asyncssh import SSHClientConnection, SSHClientProcess
-from backend.models.schemas import OSType
+from backend.models.schemas import OSType, SafetyLevel
 from backend.utils.crypto import decrypt_password
 from backend.core.exceptions import SSHConnectionError
 import json
 import time
 
 logger = logging.getLogger(__name__)
-
-
-class SafetyLevel(Enum):
-    """Command execution safety levels"""
-    DRY_RUN = "dry_run"      # Validate only, don't execute
-    SAFE = "safe"            # Execute safe commands only
-    CAUTIOUS = "cautious"    # Execute with confirmation for risky commands
-    FULL = "full"            # Execute all validated commands
 
 
 @dataclass
@@ -181,12 +172,12 @@ class SSHManager:
         # Use provided safety level or instance default
         current_safety = safety_level or self.safety_level
         
-        # Handle dry run mode
-        if current_safety == SafetyLevel.DRY_RUN:
-            logger.info(f"DRY RUN: Would execute: {command}")
+        # Handle paranoid mode (equivalent to dry run)
+        if current_safety == SafetyLevel.PARANOID:
+            logger.info(f"PARANOID MODE: Would execute: {command}")
             return CommandResult(
                 command=command,
-                stdout=f"DRY RUN: Command would be executed: {command}",
+                stdout=f"PARANOID MODE: Command would be executed: {command}",
                 stderr="",
                 exit_code=0,
                 execution_time=0.0,

@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -78,7 +78,7 @@
 
         .main-grid {
             display: grid;
-            grid-template-columns: 300px 1fr;
+            grid-template-columns: 350px 1fr 300px;
             gap: 20px;
             align-items: start;
         }
@@ -91,10 +91,36 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
 
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
         .sidebar h3 {
             color: #4a5568;
-            margin-bottom: 15px;
             font-size: 1.2rem;
+        }
+
+        .add-server-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .add-server-btn:hover {
+            background: #5a67d8;
+            transform: scale(1.1);
         }
 
         .server-list {
@@ -109,6 +135,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             border: 2px solid transparent;
+            position: relative;
         }
 
         .server-item:hover {
@@ -121,9 +148,64 @@
             border-color: #667eea;
         }
 
+        .server-item.scanning {
+            border-color: #ed8936;
+            background: rgba(237, 137, 54, 0.1);
+        }
+
+        .server-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .server-name {
             font-weight: 600;
             color: #4a5568;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .server-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f56565;
+        }
+
+        .server-status.online {
+            background: #48bb78;
+        }
+
+        .server-status.scanning {
+            background: #ed8936;
+            animation: pulse 1.5s infinite;
+        }
+
+        .server-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .server-item:hover .server-actions {
+            opacity: 1;
+        }
+
+        .server-action-btn {
+            background: none;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        .server-action-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
         }
 
         .server-info {
@@ -132,12 +214,105 @@
             margin-top: 4px;
         }
 
+        .server-profile-info {
+            font-size: 0.8rem;
+            color: #a0aec0;
+            margin-top: 2px;
+        }
+
         .command-panel {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 20px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .profile-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .profile-panel h3 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .profile-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(74, 85, 104, 0.05);
+            border-radius: 8px;
+        }
+
+        .profile-section h4 {
+            color: #4a5568;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .profile-label {
+            color: #718096;
+            font-weight: 500;
+        }
+
+        .profile-value {
+            color: #4a5568;
+            font-family: monospace;
+        }
+
+        .scan-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .scan-btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex: 1;
+        }
+
+        .scan-btn.quick {
+            background: #48bb78;
+            color: white;
+        }
+
+        .scan-btn.full {
+            background: #667eea;
+            color: white;
+        }
+
+        .scan-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .scan-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .command-input-section {
@@ -200,6 +375,15 @@
             background: #cbd5e0;
         }
 
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
         .safety-level {
             display: flex;
             gap: 10px;
@@ -232,7 +416,7 @@
 
         .output-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
             color: #cbd5e0;
@@ -284,10 +468,16 @@
             100% { transform: rotate(360deg); }
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         .alert {
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 15px;
+            position: relative;
         }
 
         .alert-success {
@@ -308,6 +498,201 @@
             color: #c05621;
         }
 
+        .alert-info {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid #667eea;
+            color: #4c51bf;
+        }
+
+        .alert-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .alert-close:hover {
+            opacity: 1;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            color: #4a5568;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #718096;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: #4a5568;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-help {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .form-error {
+            color: #e53e3e;
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #718096;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+
+        .empty-state-text {
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 300px 1fr;
+            }
+            
+            .profile-panel {
+                display: none;
+            }
+        }
+
         @media (max-width: 768px) {
             .main-grid {
                 grid-template-columns: 1fr;
@@ -315,6 +700,11 @@
             
             .sidebar {
                 order: 2;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
             }
         }
     </style>
@@ -338,11 +728,15 @@
 
         <div class="main-grid">
             <div class="sidebar">
-                <h3>📋 Servers</h3>
+                <div class="sidebar-header">
+                    <h3>📋 Servers</h3>
+                    <button class="add-server-btn" id="add-server-btn" title="Add Server">+</button>
+                </div>
                 <ul class="server-list" id="server-list">
-                    <li class="server-item">
-                        <div class="server-name">Loading servers...</div>
-                        <div class="server-info">Please wait</div>
+                    <li class="empty-state">
+                        <div class="empty-state-icon">🖥️</div>
+                        <div class="empty-state-title">Loading servers...</div>
+                        <div class="empty-state-text">Please wait</div>
                     </li>
                 </ul>
             </div>
@@ -417,6 +811,94 @@ The AI will translate your natural language into appropriate shell commands.
                     </div>
                 </div>
             </div>
+
+            <div class="profile-panel">
+                <h3>🔍 Server Profile</h3>
+                <div id="profile-content">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <div class="empty-state-title">No server selected</div>
+                        <div class="empty-state-text">Select a server to view its profile and system information</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Modal -->
+    <div class="modal" id="server-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">Add Server</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <form id="server-form">
+                <div class="form-group">
+                    <label class="form-label" for="hostname">Hostname/IP Address *</label>
+                    <input type="text" class="form-input" id="hostname" name="hostname" required>
+                    <div class="form-help">Enter the server's hostname or IP address</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="username">Username *</label>
+                    <input type="text" class="form-input" id="username" name="username" required>
+                    <div class="form-help">SSH username for connecting to the server</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="port">SSH Port</label>
+                    <input type="number" class="form-input" id="port" name="port" value="22" min="1" max="65535">
+                    <div class="form-help">SSH port (default: 22)</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" class="form-input" id="password" name="password">
+                    <div class="form-help">SSH password (leave empty if using key authentication)</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="os_type">Operating System</label>
+                    <select class="form-select" id="os_type" name="os_type">
+                        <option value="linux">Linux (Generic)</option>
+                        <option value="ubuntu">Ubuntu</option>
+                        <option value="debian">Debian</option>
+                        <option value="centos">CentOS</option>
+                        <option value="rhel">Red Hat Enterprise Linux</option>
+                        <option value="alpine">Alpine Linux</option>
+                        <option value="macos">macOS</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                    <div class="form-help">Select the server's operating system</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="description">Description</label>
+                    <textarea class="form-textarea" id="description" name="description" placeholder="Optional description for this server"></textarea>
+                    <div class="form-help">Optional description to help identify this server</div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="test-connection-btn">Test Connection</button>
+                    <button type="submit" class="btn btn-primary" id="save-server-btn">Save Server</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirm-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="confirm-title">Confirm Action</h2>
+                <button class="modal-close" id="confirm-close">&times;</button>
+            </div>
+            <div id="confirm-message">Are you sure you want to perform this action?</div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-ok">Confirm</button>
+            </div>
         </div>
     </div>
 
@@ -426,6 +908,8 @@ The AI will translate your natural language into appropriate shell commands.
                 this.baseUrl = window.location.origin;
                 this.selectedServer = null;
                 this.servers = [];
+                this.editingServer = null;
+                this.scanningServers = new Set();
                 this.init();
             }
 
@@ -472,7 +956,7 @@ The AI will translate your natural language into appropriate shell commands.
                         this.servers = data.servers || [];
                         this.renderServers();
                         
-                        if (this.servers.length > 0) {
+                        if (this.servers.length > 0 && !this.selectedServer) {
                             this.selectServer(this.servers[0]);
                         }
                     }
@@ -486,20 +970,37 @@ The AI will translate your natural language into appropriate shell commands.
                 const serverList = document.getElementById('server-list');
                 if (this.servers.length === 0) {
                     serverList.innerHTML = `
-                        <li class="server-item">
-                            <div class="server-name">No servers configured</div>
-                            <div class="server-info">Add a server to get started</div>
+                        <li class="empty-state">
+                            <div class="empty-state-icon">🖥️</div>
+                            <div class="empty-state-title">No servers configured</div>
+                            <div class="empty-state-text">Click the + button to add your first server</div>
                         </li>
                     `;
                     return;
                 }
 
-                serverList.innerHTML = this.servers.map(server => `
-                    <li class="server-item" data-server-id="${server.id}">
-                        <div class="server-name">${server.hostname}</div>
-                        <div class="server-info">${server.username}@${server.hostname}:${server.port} (${server.os_type})</div>
-                    </li>
-                `).join('');
+                serverList.innerHTML = this.servers.map(server => {
+                    const isScanning = this.scanningServers.has(server.id);
+                    const statusClass = isScanning ? 'scanning' : (server.connection_status === 'online' ? 'online' : 'offline');
+                    
+                    return `
+                        <li class="server-item ${this.selectedServer?.id === server.id ? 'active' : ''} ${isScanning ? 'scanning' : ''}" data-server-id="${server.id}">
+                            <div class="server-header">
+                                <div class="server-name">
+                                    <div class="server-status ${statusClass}"></div>
+                                    ${server.hostname}
+                                </div>
+                                <div class="server-actions">
+                                    <button class="server-action-btn" title="Scan Server" onclick="nexus.scanServer('${server.id}', 'quick')">🔍</button>
+                                    <button class="server-action-btn" title="Edit Server" onclick="nexus.editServer('${server.id}')">✏️</button>
+                                    <button class="server-action-btn" title="Delete Server" onclick="nexus.deleteServer('${server.id}')">🗑️</button>
+                                </div>
+                            </div>
+                            <div class="server-info">${server.username}@${server.hostname}:${server.port} (${server.os_type})</div>
+                            ${server.description ? `<div class="server-profile-info">${server.description}</div>` : ''}
+                        </li>
+                    `;
+                }).join('');
             }
 
             selectServer(server) {
@@ -507,22 +1008,488 @@ The AI will translate your natural language into appropriate shell commands.
                 document.querySelectorAll('.server-item').forEach(item => {
                     item.classList.remove('active');
                 });
-                document.querySelector(`[data-server-id="${server.id}"]`).classList.add('active');
+                const serverElement = document.querySelector(`[data-server-id="${server.id}"]`);
+                if (serverElement) {
+                    serverElement.classList.add('active');
+                }
                 
                 this.selectedServer = server;
                 document.getElementById('selected-server').textContent = `${server.username}@${server.hostname}`;
                 
                 this.appendOutput(`\n🔄 Switched to server: ${server.hostname}\n`);
                 this.loadHistory();
+                this.loadServerProfile(server.id);
+            }
+
+            async loadServerProfile(serverId) {
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/v1/servers/${serverId}/profile`);
+                    if (response.ok) {
+                        const profile = await response.json();
+                        this.renderServerProfile(profile);
+                    } else {
+                        this.renderServerProfile(null);
+                    }
+                } catch (error) {
+                    console.error('Failed to load server profile:', error);
+                    this.renderServerProfile(null);
+                }
+            }
+
+            renderServerProfile(profile) {
+                const profileContent = document.getElementById('profile-content');
+                
+                if (!profile || !this.selectedServer) {
+                    profileContent.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <div class="empty-state-title">No server selected</div>
+                            <div class="empty-state-text">Select a server to view its profile and system information</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Scan controls
+                const scanControls = `
+                    <div class="scan-controls">
+                        <button class="scan-btn quick" onclick="nexus.scanServer('${this.selectedServer.id}', 'quick')" ${this.scanningServers.has(this.selectedServer.id) ? 'disabled' : ''}>
+                            ${this.scanningServers.has(this.selectedServer.id) ? '⏳ Scanning...' : '⚡ Quick Scan'}
+                        </button>
+                        <button class="scan-btn full" onclick="nexus.scanServer('${this.selectedServer.id}', 'full')" ${this.scanningServers.has(this.selectedServer.id) ? 'disabled' : ''}>
+                            ${this.scanningServers.has(this.selectedServer.id) ? '⏳ Scanning...' : '🔍 Full Scan'}
+                        </button>
+                    </div>
+                `;
+
+                let profileHtml = scanControls;
+
+                // Server basic info
+                profileHtml += `
+                    <div class="profile-section">
+                        <h4>🖥️ Server Info</h4>
+                        <div class="profile-item">
+                            <span class="profile-label">Hostname:</span>
+                            <span class="profile-value">${profile.server.hostname}</span>
+                        </div>
+                        <div class="profile-item">
+                            <span class="profile-label">Username:</span>
+                            <span class="profile-value">${profile.server.username}</span>
+                        </div>
+                        <div class="profile-item">
+                            <span class="profile-label">Port:</span>
+                            <span class="profile-value">${profile.server.port}</span>
+                        </div>
+                        <div class="profile-item">
+                            <span class="profile-label">OS Type:</span>
+                            <span class="profile-value">${profile.server.os_type}</span>
+                        </div>
+                    </div>
+                `;
+
+                // System profile
+                if (profile.profile) {
+                    profileHtml += `
+                        <div class="profile-section">
+                            <h4>💻 System Profile</h4>
+                            ${profile.profile.os_family ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">OS Family:</span>
+                                    <span class="profile-value">${profile.profile.os_family}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.profile.os_distribution ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Distribution:</span>
+                                    <span class="profile-value">${profile.profile.os_distribution}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.profile.os_version ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Version:</span>
+                                    <span class="profile-value">${profile.profile.os_version}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.profile.kernel_version ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Kernel:</span>
+                                    <span class="profile-value">${profile.profile.kernel_version}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.profile.architecture ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Architecture:</span>
+                                    <span class="profile-value">${profile.profile.architecture}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.profile.last_scanned ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Last Scanned:</span>
+                                    <span class="profile-value">${new Date(profile.profile.last_scanned).toLocaleString()}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // Hardware info
+                if (profile.hardware) {
+                    profileHtml += `
+                        <div class="profile-section">
+                            <h4>⚙️ Hardware</h4>
+                            ${profile.hardware.cpu_model ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">CPU:</span>
+                                    <span class="profile-value">${profile.hardware.cpu_model}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.hardware.cpu_count ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">CPU Cores:</span>
+                                    <span class="profile-value">${profile.hardware.cpu_count}</span>
+                                </div>
+                            ` : ''}
+                            ${profile.hardware.memory_total_mb ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Total RAM:</span>
+                                    <span class="profile-value">${(profile.hardware.memory_total_mb / 1024).toFixed(1)} GB</span>
+                                </div>
+                            ` : ''}
+                            ${profile.hardware.memory_available_mb ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Available RAM:</span>
+                                    <span class="profile-value">${(profile.hardware.memory_available_mb / 1024).toFixed(1)} GB</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // Services info
+                if (profile.services) {
+                    profileHtml += `
+                        <div class="profile-section">
+                            <h4>🔧 Services</h4>
+                            <div class="profile-item">
+                                <span class="profile-label">Docker:</span>
+                                <span class="profile-value">${profile.services.has_docker ? `✅ ${profile.services.docker_version || 'Available'}` : '❌ Not available'}</span>
+                            </div>
+                            <div class="profile-item">
+                                <span class="profile-label">Systemd:</span>
+                                <span class="profile-value">${profile.services.has_systemd ? `✅ ${profile.services.systemd_version || 'Available'}` : '❌ Not available'}</span>
+                            </div>
+                            <div class="profile-item">
+                                <span class="profile-label">Sudo Access:</span>
+                                <span class="profile-value">${profile.services.has_sudo ? '✅ Available' : '❌ Not available'}</span>
+                            </div>
+                            ${profile.services.firewall_type ? `
+                                <div class="profile-item">
+                                    <span class="profile-label">Firewall:</span>
+                                    <span class="profile-value">${profile.services.firewall_type}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                profileContent.innerHTML = profileHtml;
+            }
+
+            async scanServer(serverId, scanType = 'quick') {
+                if (this.scanningServers.has(serverId)) {
+                    this.showAlert('Server is already being scanned', 'warning');
+                    return;
+                }
+
+                this.scanningServers.add(serverId);
+                this.renderServers(); // Update UI to show scanning state
+                this.renderServerProfile(null); // Update profile panel
+
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/v1/servers/${serverId}/scan`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ scan_type: scanType })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.showAlert(`${scanType} scan completed successfully`, 'success');
+                        
+                        // Reload server profile if this is the selected server
+                        if (this.selectedServer?.id === serverId) {
+                            await this.loadServerProfile(serverId);
+                        }
+                    } else {
+                        const error = await response.json();
+                        this.showAlert(`Scan failed: ${error.detail}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Scan failed:', error);
+                    this.showAlert('Scan failed: Network error', 'error');
+                } finally {
+                    this.scanningServers.delete(serverId);
+                    this.renderServers(); // Update UI to remove scanning state
+                    
+                    // Update profile panel if this is the selected server
+                    if (this.selectedServer?.id === serverId) {
+                        await this.loadServerProfile(serverId);
+                    }
+                }
+            }
+
+            // Server CRUD operations
+            showServerModal(server = null) {
+                this.editingServer = server;
+                const modal = document.getElementById('server-modal');
+                const title = document.getElementById('modal-title');
+                const form = document.getElementById('server-form');
+
+                if (server) {
+                    title.textContent = 'Edit Server';
+                    document.getElementById('hostname').value = server.hostname;
+                    document.getElementById('username').value = server.username;
+                    document.getElementById('port').value = server.port;
+                    document.getElementById('os_type').value = server.os_type;
+                    document.getElementById('description').value = server.description || '';
+                    document.getElementById('password').value = ''; // Don't populate password for security
+                } else {
+                    title.textContent = 'Add Server';
+                    form.reset();
+                    document.getElementById('port').value = '22';
+                }
+
+                modal.classList.add('show');
+            }
+
+            hideServerModal() {
+                const modal = document.getElementById('server-modal');
+                modal.classList.remove('show');
+                this.editingServer = null;
+            }
+
+            async saveServer() {
+                const form = document.getElementById('server-form');
+                const formData = new FormData(form);
+                
+                const serverData = {
+                    hostname: formData.get('hostname'),
+                    username: formData.get('username'),
+                    port: parseInt(formData.get('port')),
+                    os_type: formData.get('os_type'),
+                    description: formData.get('description') || null
+                };
+
+                const password = formData.get('password');
+                if (password) {
+                    serverData.password = password;
+                }
+
+                try {
+                    let response;
+                    if (this.editingServer) {
+                        // Update existing server
+                        response = await fetch(`${this.baseUrl}/api/v1/servers/${this.editingServer.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(serverData)
+                        });
+                    } else {
+                        // Create new server
+                        response = await fetch(`${this.baseUrl}/api/v1/servers/`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(serverData)
+                        });
+                    }
+
+                    if (response.ok) {
+                        const server = await response.json();
+                        this.showAlert(`Server ${this.editingServer ? 'updated' : 'created'} successfully`, 'success');
+                        this.hideServerModal();
+                        await this.loadServers();
+                        
+                        // Select the new/updated server
+                        this.selectServer(server);
+                    } else {
+                        const error = await response.json();
+                        this.showAlert(`Failed to ${this.editingServer ? 'update' : 'create'} server: ${error.detail}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to save server:', error);
+                    this.showAlert('Failed to save server: Network error', 'error');
+                }
+            }
+
+            async testConnection() {
+                const form = document.getElementById('server-form');
+                const formData = new FormData(form);
+                
+                const serverData = {
+                    hostname: formData.get('hostname'),
+                    username: formData.get('username'),
+                    port: parseInt(formData.get('port')),
+                    password: formData.get('password') || null
+                };
+
+                const testBtn = document.getElementById('test-connection-btn');
+                const originalText = testBtn.textContent;
+                testBtn.textContent = 'Testing...';
+                testBtn.disabled = true;
+
+                try {
+                    // For testing, we'll create a temporary server or use validation endpoint
+                    // This is a simplified approach - in production you might want a dedicated test endpoint
+                    const response = await fetch(`${this.baseUrl}/api/v1/servers/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({...serverData, description: 'TEMP_TEST_SERVER'})
+                    });
+
+                    if (response.ok) {
+                        const tempServer = await response.json();
+                        
+                        // Test the connection
+                        const testResponse = await fetch(`${this.baseUrl}/api/v1/servers/${tempServer.id}/test-connection`, {
+                            method: 'POST'
+                        });
+
+                        const testResult = await testResponse.json();
+                        
+                        // Clean up temp server
+                        await fetch(`${this.baseUrl}/api/v1/servers/${tempServer.id}`, {
+                            method: 'DELETE'
+                        });
+
+                        if (testResult.connection_status === 'success') {
+                            this.showAlert('Connection test successful!', 'success');
+                        } else {
+                            this.showAlert(`Connection test failed: ${testResult.error || 'Unknown error'}`, 'error');
+                        }
+                    } else {
+                        const error = await response.json();
+                        this.showAlert(`Connection test failed: ${error.detail}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Connection test failed:', error);
+                    this.showAlert('Connection test failed: Network error', 'error');
+                } finally {
+                    testBtn.textContent = originalText;
+                    testBtn.disabled = false;
+                }
+            }
+
+            editServer(serverId) {
+                const server = this.servers.find(s => s.id === serverId);
+                if (server) {
+                    this.showServerModal(server);
+                }
+            }
+
+            deleteServer(serverId) {
+                const server = this.servers.find(s => s.id === serverId);
+                if (!server) return;
+
+                this.showConfirmModal(
+                    'Delete Server',
+                    `Are you sure you want to delete server "${server.hostname}"? This action cannot be undone.`,
+                    async () => {
+                        try {
+                            const response = await fetch(`${this.baseUrl}/api/v1/servers/${serverId}`, {
+                                method: 'DELETE'
+                            });
+
+                            if (response.ok) {
+                                this.showAlert('Server deleted successfully', 'success');
+                                await this.loadServers();
+                                
+                                // If deleted server was selected, clear selection
+                                if (this.selectedServer?.id === serverId) {
+                                    this.selectedServer = null;
+                                    document.getElementById('selected-server').textContent = 'No server selected';
+                                    this.renderServerProfile(null);
+                                }
+                            } else {
+                                const error = await response.json();
+                                this.showAlert(`Failed to delete server: ${error.detail}`, 'error');
+                            }
+                        } catch (error) {
+                            console.error('Failed to delete server:', error);
+                            this.showAlert('Failed to delete server: Network error', 'error');
+                        }
+                    }
+                );
+            }
+
+            showConfirmModal(title, message, onConfirm) {
+                const modal = document.getElementById('confirm-modal');
+                document.getElementById('confirm-title').textContent = title;
+                document.getElementById('confirm-message').textContent = message;
+                
+                const confirmBtn = document.getElementById('confirm-ok');
+                const cancelBtn = document.getElementById('confirm-cancel');
+                
+                // Remove existing listeners
+                const newConfirmBtn = confirmBtn.cloneNode(true);
+                const newCancelBtn = cancelBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+                
+                // Add new listeners
+                newConfirmBtn.addEventListener('click', () => {
+                    modal.classList.remove('show');
+                    onConfirm();
+                });
+                
+                newCancelBtn.addEventListener('click', () => {
+                    modal.classList.remove('show');
+                });
+
+                modal.classList.add('show');
             }
 
             setupEventListeners() {
                 // Server selection
                 document.addEventListener('click', (e) => {
                     const serverItem = e.target.closest('.server-item');
-                    if (serverItem && serverItem.dataset.serverId) {
+                    if (serverItem && serverItem.dataset.serverId && !e.target.closest('.server-actions')) {
                         const server = this.servers.find(s => s.id === serverItem.dataset.serverId);
                         if (server) this.selectServer(server);
+                    }
+                });
+
+                // Add server button
+                document.getElementById('add-server-btn').addEventListener('click', () => {
+                    this.showServerModal();
+                });
+
+                // Modal controls
+                document.getElementById('modal-close').addEventListener('click', () => {
+                    this.hideServerModal();
+                });
+
+                document.getElementById('cancel-btn').addEventListener('click', () => {
+                    this.hideServerModal();
+                });
+
+                document.getElementById('confirm-close').addEventListener('click', () => {
+                    document.getElementById('confirm-modal').classList.remove('show');
+                });
+
+                // Server form
+                document.getElementById('server-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.saveServer();
+                });
+
+                document.getElementById('test-connection-btn').addEventListener('click', () => {
+                    this.testConnection();
+                });
+
+                // Close modals on outside click
+                document.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal')) {
+                        e.target.classList.remove('show');
                     }
                 });
 
@@ -668,14 +1635,26 @@ The AI will translate your natural language into appropriate shell commands.
                 // Create alert element
                 const alert = document.createElement('div');
                 alert.className = `alert alert-${type}`;
-                alert.textContent = message;
+                alert.innerHTML = `
+                    ${message}
+                    <button class="alert-close">&times;</button>
+                `;
+                
+                // Add close functionality
+                alert.querySelector('.alert-close').addEventListener('click', () => {
+                    alert.remove();
+                });
                 
                 // Insert at top of command panel
                 const panel = document.querySelector('.command-panel');
                 panel.insertBefore(alert, panel.firstChild);
                 
                 // Remove after 5 seconds
-                setTimeout(() => alert.remove(), 5000);
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 5000);
             }
 
             addToHistory(command, success, type) {
@@ -691,6 +1670,12 @@ The AI will translate your natural language into appropriate shell commands.
                         ${success ? '✅ Success' : '❌ Failed'}
                     </div>
                 `;
+                
+                // Remove "no commands" placeholder if it exists
+                const placeholder = historyList.querySelector('.history-item');
+                if (placeholder && placeholder.textContent.includes('No commands executed yet')) {
+                    placeholder.remove();
+                }
                 
                 historyList.insertBefore(historyItem, historyList.firstChild);
                 
@@ -721,8 +1706,9 @@ The AI will translate your natural language into appropriate shell commands.
         }
 
         // Initialize when page loads
+        let nexus;
         document.addEventListener('DOMContentLoaded', () => {
-            new NexusClient();
+            nexus = new NexusClient();
         });
     </script>
 </body>

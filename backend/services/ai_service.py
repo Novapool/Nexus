@@ -17,6 +17,7 @@ from backend.models.schemas import (
     OSType
 )
 from backend.core.exceptions import AIServiceError
+from backend.core.safety_validator import SafetyValidator
 
 logger = logging.getLogger(__name__)
 
@@ -132,62 +133,17 @@ Provide your response in JSON format:
         command: str,
         server_context: Optional[Dict[str, Any]] = None
     ) -> CommandValidationResult:
-        """Validate if a command is safe to execute"""
+        """Validate if a command is safe to execute using centralized validator"""
         
-        # Basic safety checks
-        dangerous_patterns = [
-            "rm -rf /", "rm -rf /*", "mkfs", "dd if=", ":(){ :|:& };:",
-            "chmod -R 777 /", "chown -R", "sudo rm", "format", "fdisk"
-        ]
-        
-        high_risk_patterns = [
-            "sudo", "rm -rf", "chmod 777", "wget | sh", "curl | sh",
-            "mv /etc", "cp /etc", "shutdown", "reboot", "init 0"
-        ]
-        
-        medium_risk_patterns = [
-            "rm ", "rmdir", "chmod", "chown", "mv", "cp /", "crontab"
-        ]
-        
-        warnings = []
-        risk_level = RiskLevel.SAFE
-        is_safe = True
-        
-        # Check for dangerous patterns
-        command_lower = command.lower()
-        
-        for pattern in dangerous_patterns:
-            if pattern in command_lower:
-                risk_level = RiskLevel.DANGEROUS
-                is_safe = False
-                warnings.append(f"Contains dangerous pattern: {pattern}")
-        
-        if is_safe:
-            for pattern in high_risk_patterns:
-                if pattern in command_lower:
-                    risk_level = RiskLevel.HIGH
-                    warnings.append(f"High-risk operation: {pattern}")
-            
-            for pattern in medium_risk_patterns:
-                if pattern in command_lower:
-                    if risk_level == RiskLevel.SAFE:
-                        risk_level = RiskLevel.MEDIUM
-                    warnings.append(f"Potentially risky operation: {pattern}")
-        
-        # Additional context-based validation
-        if server_context:
-            os_type = server_context.get("os_type", OSType.LINUX)
-            if os_type == OSType.MACOS and "apt" in command_lower:
-                warnings.append("Using apt on macOS - should probably use brew instead")
-        
-        explanation = self._generate_safety_explanation(command, risk_level, warnings)
+        # Use centralized safety validator
+        assessment = SafetyValidator.assess_command_risk(command, server_context)
         
         return CommandValidationResult(
-            is_safe=is_safe,
-            risk_level=risk_level,
-            warnings=warnings,
-            explanation=explanation,
-            suggested_fixes=[]  # TODO: Implement suggested fixes
+            is_safe=assessment["is_safe"],
+            risk_level=assessment["risk_level"],
+            warnings=assessment["warnings"],
+            explanation=assessment["explanation"],
+            suggested_fixes=[]  # Could be enhanced with specific fix suggestions
         )
     
     async def list_models(self) -> List[str]:
