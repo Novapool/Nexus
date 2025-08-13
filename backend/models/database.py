@@ -29,8 +29,15 @@ class Server(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
+    # System profiling columns
+    system_info = Column(JSON, nullable=True)  # Stores comprehensive scan results
+    last_scan_date = Column(DateTime, nullable=True)
+    
     # Relationships
     command_history = relationship("CommandHistory", back_populates="server", cascade="all, delete-orphan")
+    profile = relationship("ServerProfile", back_populates="server", uselist=False, cascade="all, delete-orphan")
+    hardware = relationship("ServerHardware", back_populates="server", uselist=False, cascade="all, delete-orphan")
+    services = relationship("ServerServices", back_populates="server", uselist=False, cascade="all, delete-orphan")
 
 
 class User(Base):
@@ -195,3 +202,91 @@ class OperationExecution(Base):
 # OperationStepExecution and OperationTemplate classes removed
 # Data consolidated into OperationExecution.step_results_json
 # Templates are not essential for core functionality
+
+
+class ServerProfile(Base):
+    """Server system profile information"""
+    __tablename__ = "server_profiles"
+    
+    id = Column(String, primary_key=True)
+    server_id = Column(String, ForeignKey("servers.id"), nullable=False, unique=True, index=True)
+    
+    # OS Information
+    os_family = Column(String(50), nullable=True)
+    os_distribution = Column(String(100), nullable=True)
+    os_version = Column(String(50), nullable=True)
+    kernel_version = Column(String(100), nullable=True)
+    architecture = Column(String(50), nullable=True)
+    package_manager = Column(String(50), nullable=True)
+    init_system = Column(String(50), nullable=True)
+    
+    # Scan metadata
+    last_scanned = Column(DateTime, nullable=True)
+    scan_data = Column(JSON, nullable=True)  # Complete scan results
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    server = relationship("Server", back_populates="profile")
+
+
+class ServerHardware(Base):
+    """Server hardware information"""
+    __tablename__ = "server_hardware"
+    
+    id = Column(String, primary_key=True)
+    server_id = Column(String, ForeignKey("servers.id"), nullable=False, unique=True, index=True)
+    
+    # CPU Information
+    cpu_count = Column(Integer, nullable=True)
+    cpu_model = Column(String(255), nullable=True)
+    
+    # Memory Information
+    memory_total_mb = Column(Integer, nullable=True)
+    memory_available_mb = Column(Integer, nullable=True)
+    swap_total_mb = Column(Integer, nullable=True)
+    
+    # JSON fields for detailed info
+    cpu_info = Column(JSON, nullable=True)
+    memory_info = Column(JSON, nullable=True)
+    storage_info = Column(JSON, nullable=True)  # Array of storage devices
+    gpu_info = Column(JSON, nullable=True)  # Array of GPU devices
+    network_info = Column(JSON, nullable=True)  # Array of network interfaces
+    
+    # Metadata
+    last_updated = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    server = relationship("Server", back_populates="hardware")
+
+
+class ServerServices(Base):
+    """Server services and capabilities"""
+    __tablename__ = "server_services"
+    
+    id = Column(String, primary_key=True)
+    server_id = Column(String, ForeignKey("servers.id"), nullable=False, unique=True, index=True)
+    
+    # Service availability
+    has_docker = Column(Boolean, default=False, nullable=False)
+    docker_version = Column(String(100), nullable=True)
+    has_systemd = Column(Boolean, default=False, nullable=False)
+    systemd_version = Column(String(100), nullable=True)
+    has_sudo = Column(Boolean, default=False, nullable=False)
+    firewall_type = Column(String(50), nullable=True)
+    
+    # JSON fields for detailed info
+    listening_ports = Column(JSON, nullable=True)  # Array of listening ports
+    running_services = Column(JSON, nullable=True)  # Array of running services
+    
+    # Metadata
+    last_updated = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    server = relationship("Server", back_populates="services")
