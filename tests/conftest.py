@@ -4,15 +4,18 @@ Pytest configuration and shared fixtures
 
 import pytest
 import asyncio
+import tempfile
+import os
 from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
-import tempfile
-import os
 
 from backend.config.database import Base
 from backend.models.database import Server, User
 from backend.config.settings import Settings
+
+# Import ALL models to ensure they're registered with Base.metadata
+from backend.models import database
 
 
 @pytest.fixture(scope="session")
@@ -40,7 +43,7 @@ def test_settings() -> Settings:
 
 @pytest.fixture(scope="function")
 async def test_db() -> AsyncGenerator[AsyncSession, None]:
-    """Create a test database session"""
+    """Create a test database session with proper schema"""
     # Create test database engine
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -48,7 +51,7 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
         echo=False
     )
     
-    # Create tables
+    # Create all tables directly from models - this is the simplest approach
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
@@ -143,99 +146,7 @@ def mock_ssh_manager(mocker, mock_ssh_connection):
     mock_manager = mocker.Mock(spec=SSHManager)
     mock_manager.connect = mocker.AsyncMock(return_value=True)
     mock_manager.disconnect = mocker.AsyncMock()
-    mock_manager.is_connected = mocker.Mock(return_value=True)
     mock_manager.execute_command = mocker.AsyncMock()
-    mock_manager.test_connection = mocker.AsyncMock(
-        return_value={
-            "success": True,
-            "response_time_ms": 10.5,
-            "test_output": "Connection test successful",
-            "server_info": {
-                "hostname": "test-server.local",
-                "port": 22,
-                "username": "testuser",
-                "connected": True
-            }
-        }
-    )
-    mock_manager.gather_system_info = mocker.AsyncMock(
-        return_value={
-            "hostname": "test-server",
-            "os_release": "Ubuntu 22.04",
-            "kernel": "5.15.0-generic",
-            "architecture": "x86_64",
-            "cpu_info": "4",
-            "memory_info": "8192",
-            "disk_usage": "45%",
-            "uptime": "up 5 days",
-            "shell": "/bin/bash",
-            "user": "testuser",
-            "working_dir": "/home/testuser",
-            "package_manager": "apt",
-            "os_type": "ubuntu"
-        }
-    )
+    mock_manager.get_connection = mocker.AsyncMock(return_value=mock_ssh_connection)
     
     return mock_manager
-
-
-@pytest.fixture
-def sample_scan_result():
-    """Sample scan result for testing"""
-    return {
-        "server_id": "test-server-id",
-        "scan_type": "full",
-        "scan_timestamp": "2025-01-13T12:00:00",
-        "success": True,
-        "error": None,
-        "system_profile": {
-            "os_family": "debian",
-            "os_distribution": "ubuntu",
-            "os_version": "22.04",
-            "kernel_version": "5.15.0-generic",
-            "architecture": "x86_64",
-            "package_manager": "apt",
-            "init_system": "systemd",
-            "hostname": "test-server",
-            "last_scanned": "2025-01-13T12:00:00"
-        },
-        "hardware_profile": {
-            "cpu_count": 4,
-            "cpu_model": "Intel Core i7",
-            "memory_total_mb": 8192,
-            "memory_available_mb": 4096,
-            "swap_total_mb": 2048,
-            "storage_devices": [
-                {
-                    "filesystem": "/dev/sda1",
-                    "size": "100G",
-                    "used": "45G",
-                    "available": "55G",
-                    "use_percent": "45%",
-                    "mount_point": "/"
-                }
-            ],
-            "gpu_devices": [],
-            "network_interfaces": [
-                {
-                    "name": "eth0",
-                    "addresses": [
-                        {"type": "ipv4", "address": "192.168.1.100/24"}
-                    ]
-                }
-            ]
-        },
-        "service_profile": {
-            "has_docker": True,
-            "docker_version": "Docker version 24.0.7",
-            "has_systemd": True,
-            "systemd_version": "systemd 249",
-            "has_sudo": True,
-            "firewall_type": "ufw",
-            "listening_ports": [
-                {"port": "22", "protocol": "tcp", "address": "0.0.0.0:22"},
-                {"port": "80", "protocol": "tcp", "address": "0.0.0.0:80"}
-            ],
-            "running_services": ["ssh", "nginx", "docker"]
-        }
-    }
