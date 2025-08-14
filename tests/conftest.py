@@ -11,11 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.pool import NullPool
 
 from backend.config.database import Base
-from backend.models.database import Server, User
-from backend.config.settings import Settings
 
 # Import ALL models to ensure they're registered with Base.metadata
-from backend.models import database
+# This is crucial - all models must be imported before create_all()
+from backend.models.database import (
+    Server, User, CommandHistory, AuditLog, 
+    OperationPlan, OperationExecution,
+    ServerProfile, ServerHardware, ServerServices
+)
+from backend.config.settings import Settings
 
 
 @pytest.fixture(scope="session")
@@ -44,35 +48,48 @@ def test_settings() -> Settings:
 @pytest.fixture(scope="function")
 async def test_db() -> AsyncGenerator[AsyncSession, None]:
     """Create a test database session with proper schema"""
-    # Create test database engine
+    # Create test database engine with echo for debugging
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=NullPool,
-        echo=False
+        echo=False  # Set to True if you need to debug SQL
     )
     
-    # Create all tables directly from models - this is the simplest approach
+    # Ensure all models are imported before creating tables
+    from backend.models import database  # Import the module to register all models
+    
+    # Create all tables from the metadata
     async with engine.begin() as conn:
+        # Drop all tables first to ensure clean state
+        await conn.run_sync(Base.metadata.drop_all)
+        # Create all tables with current schema
         await conn.run_sync(Base.metadata.create_all)
     
-    # Create session
+    # Create session factory
     async_session = async_sessionmaker(
         engine, 
         class_=AsyncSession,
         expire_on_commit=False
     )
     
+    # Provide the session
     async with async_session() as session:
-        yield session
-        await session.rollback()
+        try:
+            yield session
+            await session.rollback()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
     
-    # Clean up
+    # Clean up engine
     await engine.dispose()
 
 
 @pytest.fixture
 async def test_server(test_db: AsyncSession) -> Server:
-    """Create a test server"""
+    """Create a test server with all required fields"""
     import uuid
     from datetime import datetime
     
@@ -84,9 +101,14 @@ async def test_server(test_db: AsyncSession) -> Server:
         description="Test server for unit tests",
         os_type="linux",
         password="encrypted_test_password",
+        private_key=None,
         connection_status="unknown",
+        last_connected=None,
         created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        updated_at=datetime.utcnow(),
+        # Explicitly set system profiling fields to None
+        system_info=None,  # NOT 'null' string!
+        last_scan_date=None
     )
     
     test_db.add(server)
@@ -110,7 +132,8 @@ async def test_user(test_db: AsyncSession) -> User:
         is_active=True,
         is_admin=False,
         created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        updated_at=datetime.utcnow(),
+        last_login=None
     )
     
     test_db.add(user)
@@ -139,14 +162,49 @@ def mock_ssh_connection(mocker):
 
 
 @pytest.fixture
-def mock_ssh_manager(mocker, mock_ssh_connection):
+def mock_ssh_manager(mocker):
     """Mock SSH manager for testing"""
-    from backend.core.ssh_manager import SSHManager
+    mock = mocker.AsyncMock()
+    mock.connect = mocker.AsyncMock(return_value=True)
+    mock.disconnect = mocker.AsyncMock()
+    mock.execute_command = mocker.AsyncMock()
+    mock.get_connection = mocker.AsyncMock()
+    mock.is_connected = mocker.Mock(return_value=True)
     
-    mock_manager = mocker.Mock(spec=SSHManager)
-    mock_manager.connect = mocker.AsyncMock(return_value=True)
-    mock_manager.disconnect = mocker.AsyncMock()
-    mock_manager.execute_command = mocker.AsyncMock()
-    mock_manager.get_connection = mocker.AsyncMock(return_value=mock_ssh_connection)
+    # Default command result
+    from unittest.mock import Mock
+    mock.execute_command.return_value = Mock(
+        success=True,
+        stdout="",
+        stderr="",
+        exit_code=0
+    )
     
-    return mock_manager
+    return mock
+
+
+@pytest.fixture
+def mock_encryption(mocker):
+    """Mock encryption functions"""
+    mocker.patch('backend.core.security.encrypt_password', return_value="encrypted_password")
+    mocker.patch('backend.core.security.decrypt_password', return_value="decrypted_password")
+    mocker.patch('backend.core.security.encrypt_data', return_value="encrypted_data")
+    mocker.patch('backend.core.security.decrypt_data', return_value="decrypted_data")
+
+
+@pytest.fixture
+async def clean_db(test_db: AsyncSession):
+    """Fixture to ensure database is clean before and after test"""
+    # Clean up any existing data
+    await test_db.execute("DELETE FROM command_history")
+    await test_db.execute("DELETE FROM server_services")
+    await test_db.execute("DELETE FROM server_hardware")
+    await test_db.execute("DELETE FROM server_profiles")
+    await test_db.execute("DELETE FROM servers")
+    await test_db.execute("DELETE FROM users")
+    await test_db.commit()
+    
+    yield test_db
+    
+    # Clean up after test
+    await test_db.rollback()

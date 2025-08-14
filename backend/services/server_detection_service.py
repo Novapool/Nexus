@@ -502,20 +502,169 @@ class ServerDetectionService:
     async def _update_server_scan_data(self, server_id: str, scan_results: Dict[str, Any]):
         """Update server record with scan data"""
         try:
-            # Store scan results in a JSON column (we'll add this in migration)
+            from sqlalchemy import select
+            from backend.models.database import ServerProfile, ServerHardware, ServerServices
+            import uuid
+            
+            # Update main server record
             query = (
                 update(Server)
                 .where(Server.id == server_id)
                 .values(
                     updated_at=datetime.utcnow(),
-                    # We'll add system_info column in migration
-                    # system_info=json.dumps(scan_results)
+                    system_info=scan_results,
+                    last_scan_date=datetime.utcnow()
                 )
             )
             await self.db.execute(query)
+            
+            # Update or create system profile
+            if 'system_profile' in scan_results:
+                profile_data = scan_results['system_profile']
+                
+                # Check if profile exists
+                profile_query = select(ServerProfile).where(ServerProfile.server_id == server_id)
+                profile_result = await self.db.execute(profile_query)
+                existing_profile = profile_result.scalar_one_or_none()
+                
+                if existing_profile:
+                    # Update existing profile
+                    update_query = (
+                        update(ServerProfile)
+                        .where(ServerProfile.server_id == server_id)
+                        .values(
+                            os_family=profile_data.get('os_family'),
+                            os_distribution=profile_data.get('os_distribution'),
+                            os_version=profile_data.get('os_version'),
+                            kernel_version=profile_data.get('kernel_version'),
+                            architecture=profile_data.get('architecture'),
+                            package_manager=profile_data.get('package_manager'),
+                            init_system=profile_data.get('init_system'),
+                            last_scanned=datetime.utcnow(),
+                            scan_data=profile_data,
+                            updated_at=datetime.utcnow()
+                        )
+                    )
+                    await self.db.execute(update_query)
+                else:
+                    # Create new profile
+                    new_profile = ServerProfile(
+                        id=str(uuid.uuid4()),
+                        server_id=server_id,
+                        os_family=profile_data.get('os_family'),
+                        os_distribution=profile_data.get('os_distribution'),
+                        os_version=profile_data.get('os_version'),
+                        kernel_version=profile_data.get('kernel_version'),
+                        architecture=profile_data.get('architecture'),
+                        package_manager=profile_data.get('package_manager'),
+                        init_system=profile_data.get('init_system'),
+                        last_scanned=datetime.utcnow(),
+                        scan_data=profile_data,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    self.db.add(new_profile)
+            
+            # Update or create hardware profile
+            if 'hardware_profile' in scan_results:
+                hardware_data = scan_results['hardware_profile']
+                
+                # Check if hardware record exists
+                hardware_query = select(ServerHardware).where(ServerHardware.server_id == server_id)
+                hardware_result = await self.db.execute(hardware_query)
+                existing_hardware = hardware_result.scalar_one_or_none()
+                
+                if existing_hardware:
+                    # Update existing hardware
+                    update_query = (
+                        update(ServerHardware)
+                        .where(ServerHardware.server_id == server_id)
+                        .values(
+                            cpu_count=hardware_data.get('cpu_count'),
+                            cpu_model=hardware_data.get('cpu_model'),
+                            memory_total_mb=hardware_data.get('memory_total_mb'),
+                            memory_available_mb=hardware_data.get('memory_available_mb'),
+                            swap_total_mb=hardware_data.get('swap_total_mb'),
+                            storage_info=hardware_data.get('storage_devices'),
+                            gpu_info=hardware_data.get('gpu_devices'),
+                            network_info=hardware_data.get('network_interfaces'),
+                            last_updated=datetime.utcnow(),
+                            updated_at=datetime.utcnow()
+                        )
+                    )
+                    await self.db.execute(update_query)
+                else:
+                    # Create new hardware record
+                    new_hardware = ServerHardware(
+                        id=str(uuid.uuid4()),
+                        server_id=server_id,
+                        cpu_count=hardware_data.get('cpu_count'),
+                        cpu_model=hardware_data.get('cpu_model'),
+                        memory_total_mb=hardware_data.get('memory_total_mb'),
+                        memory_available_mb=hardware_data.get('memory_available_mb'),
+                        swap_total_mb=hardware_data.get('swap_total_mb'),
+                        storage_info=hardware_data.get('storage_devices'),
+                        gpu_info=hardware_data.get('gpu_devices'),
+                        network_info=hardware_data.get('network_interfaces'),
+                        last_updated=datetime.utcnow(),
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    self.db.add(new_hardware)
+            
+            # Update or create services profile
+            if 'service_profile' in scan_results:
+                services_data = scan_results['service_profile']
+                
+                # Check if services record exists
+                services_query = select(ServerServices).where(ServerServices.server_id == server_id)
+                services_result = await self.db.execute(services_query)
+                existing_services = services_result.scalar_one_or_none()
+                
+                if existing_services:
+                    # Update existing services
+                    update_query = (
+                        update(ServerServices)
+                        .where(ServerServices.server_id == server_id)
+                        .values(
+                            has_docker=services_data.get('has_docker', False),
+                            docker_version=services_data.get('docker_version'),
+                            has_systemd=services_data.get('has_systemd', False),
+                            systemd_version=services_data.get('systemd_version'),
+                            has_sudo=services_data.get('has_sudo', False),
+                            firewall_type=services_data.get('firewall_type'),
+                            listening_ports=services_data.get('listening_ports', []),
+                            running_services=services_data.get('running_services', []),
+                            last_updated=datetime.utcnow(),
+                            updated_at=datetime.utcnow()
+                        )
+                    )
+                    await self.db.execute(update_query)
+                else:
+                    # Create new services record
+                    new_services = ServerServices(
+                        id=str(uuid.uuid4()),
+                        server_id=server_id,
+                        has_docker=services_data.get('has_docker', False),
+                        docker_version=services_data.get('docker_version'),
+                        has_systemd=services_data.get('has_systemd', False),
+                        systemd_version=services_data.get('systemd_version'),
+                        has_sudo=services_data.get('has_sudo', False),
+                        firewall_type=services_data.get('firewall_type'),
+                        listening_ports=services_data.get('listening_ports', []),
+                        running_services=services_data.get('running_services', []),
+                        last_updated=datetime.utcnow(),
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    self.db.add(new_services)
+            
             await self.db.commit()
+            logger.info(f"Successfully updated scan data for server {server_id}")
+            
         except Exception as e:
             logger.error(f"Failed to update server scan data: {e}")
+            await self.db.rollback()
     
     async def validate_connection(self, server_id: str) -> Dict[str, Any]:
         """Validate server connection before operations"""

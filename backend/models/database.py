@@ -29,7 +29,7 @@ class Server(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
-    # System profiling columns
+    # System profiling columns (added in migration 005)
     system_info = Column(JSON, nullable=True)  # Stores comprehensive scan results
     last_scan_date = Column(DateTime, nullable=True)
     
