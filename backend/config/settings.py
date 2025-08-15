@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore"  # Allow extra environment variables (like test settings)
     )
     
     # Core settings (8 essential settings)
