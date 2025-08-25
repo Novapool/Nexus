@@ -61,8 +61,11 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Project-specific database
-data/nexus.db
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Flask stuff:
 instance/
