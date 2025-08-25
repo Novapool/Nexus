@@ -3,7 +3,7 @@ Simplified API Routes initialization
 """
 
 from fastapi import APIRouter
-from backend.api.routes import health, servers, ai, operations, commands
+from backend.api.routes import health, servers, ai, operations, commands, terminal
 from backend.config.settings import get_settings
 
 # Create main API router
@@ -45,4 +45,10 @@ if settings.enable_operation_planning:
         tags=["operations"]
     )
 
-# Note: auth and terminal routes removed (not implemented)
+# Include terminal routes for real-time SSH sessions
+api_router.include_router(
+    terminal.router,
+    tags=["terminal"]
+)
+
+# Note: auth routes not implemented

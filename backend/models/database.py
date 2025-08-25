@@ -6,6 +6,7 @@ from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean, Foreign
 from sqlalchemy.orm import relationship
 from backend.config.database import Base
 import datetime
+import uuid
 
 
 class Server(Base):
@@ -38,6 +39,7 @@ class Server(Base):
     profile = relationship("ServerProfile", back_populates="server", uselist=False, cascade="all, delete-orphan")
     hardware = relationship("ServerHardware", back_populates="server", uselist=False, cascade="all, delete-orphan")
     services = relationship("ServerServices", back_populates="server", uselist=False, cascade="all, delete-orphan")
+    terminal_sessions = relationship("TerminalSession", back_populates="server", cascade="all, delete-orphan")
 
 
 class User(Base):
@@ -57,6 +59,7 @@ class User(Base):
     
     # Relationships
     command_history = relationship("CommandHistory", back_populates="user")
+    terminal_sessions = relationship("TerminalSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class CommandHistory(Base):
@@ -290,3 +293,79 @@ class ServerServices(Base):
     
     # Relationships
     server = relationship("Server", back_populates="services")
+
+
+class TerminalSession(Base):
+    """Terminal session model for persistent SSH sessions"""
+    __tablename__ = "terminal_sessions"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_token = Column(String(255), unique=True, nullable=False)
+    server_id = Column(String, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    # Session state
+    working_directory = Column(String(500), nullable=False, default="/home")
+    environment_vars = Column(Text, nullable=True)  # JSON string of env vars
+    terminal_size = Column(JSON, nullable=True)  # {"cols": 80, "rows": 24}
+    command_history = Column(JSON, nullable=True)  # List of recent commands
+    
+    # Connection info
+    is_active = Column(Boolean, nullable=False, default=True)
+    connection_id = Column(String(255), nullable=True)  # WebSocket connection ID
+    session_type = Column(String(50), nullable=False, default="shell")  # shell, sftp, etc.
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    last_activity = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+    
+    # Additional metadata
+    session_metadata = Column(JSON, nullable=True)
+    
+    # Relationships
+    server = relationship("Server", back_populates="terminal_sessions")
+    user = relationship("User", back_populates="terminal_sessions")
+    logs = relationship("TerminalSessionLog", back_populates="session", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "session_token": self.session_token,
+            "server_id": self.server_id,
+            "user_id": self.user_id,
+            "working_directory": self.working_directory,
+            "terminal_size": self.terminal_size,
+            "is_active": self.is_active,
+            "session_type": self.session_type,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_activity": self.last_activity.isoformat() if self.last_activity else None,
+            "closed_at": self.closed_at.isoformat() if self.closed_at else None
+        }
+
+
+class TerminalSessionLog(Base):
+    """Audit log for terminal session activities"""
+    __tablename__ = "terminal_session_logs"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id = Column(String, ForeignKey("terminal_sessions.id", ondelete="CASCADE"), nullable=False)
+    timestamp = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    event_type = Column(String(50), nullable=False)  # command, output, error, connect, disconnect
+    data = Column(Text, nullable=True)
+    log_metadata = Column(JSON, nullable=True)
+    
+    # Relationships
+    session = relationship("TerminalSession", back_populates="logs")
+    
+    def to_dict(self):
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "event_type": self.event_type,
+            "data": self.data,
+            "metadata": self.log_metadata
+        }

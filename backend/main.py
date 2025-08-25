@@ -22,6 +22,8 @@ from backend.config.database import init_db, close_db
 from backend.api.routes import api_router
 from backend.api.routes import health  # Import health router separately
 from backend.core.exceptions import NexusException
+from backend.services.terminal_service import terminal_service
+from backend.core.ssh_manager import ssh_factory
 
 
 # Configure logging
@@ -40,10 +42,23 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     
+    # Start terminal session service
+    await terminal_service.start()
+    logger.info("Terminal session service started")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down Nexus application...")
+    
+    # Stop terminal session service
+    await terminal_service.stop()
+    logger.info("Terminal session service stopped")
+    
+    # Clean up SSH connections
+    await ssh_factory.disconnect_all()
+    logger.info("SSH connections closed")
+    
     await close_db()
     logger.info("Database connections closed")
 
@@ -90,6 +105,13 @@ def create_application() -> FastAPI:
                 @app.get("/", response_class=HTMLResponse)
                 async def serve_frontend():
                     return frontend_file.read_text(encoding='utf-8')
+            
+            # Serve the terminal interface at /terminal
+            terminal_file = project_root / "frontend" / "terminal.html"
+            if terminal_file.exists():
+                @app.get("/terminal", response_class=HTMLResponse)
+                async def serve_terminal():
+                    return terminal_file.read_text(encoding='utf-8')
             
             # Serve other static files
             static_dir = project_root / "frontend" / "static"
