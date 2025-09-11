@@ -12,6 +12,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPExce
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from pydantic import BaseModel
 
 from backend.config.database import get_db
 from backend.models.database import Server, TerminalSession, User
@@ -23,6 +24,11 @@ from backend.core.exceptions import SSHConnectionError
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/terminal", tags=["terminal"])
+
+
+class CreateTerminalSessionRequest(BaseModel):
+    """Request model for creating terminal sessions"""
+    server_id: str
 
 
 class TerminalWebSocketManager:
@@ -61,11 +67,13 @@ ws_manager = TerminalWebSocketManager()
 
 @router.post("/sessions")
 async def create_terminal_session(
-    server_id: str,
+    request: CreateTerminalSessionRequest,
     db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
     """Create a new terminal session for a server"""
     try:
+        server_id = request.server_id
+        
         # Get server configuration
         query = select(Server).where(Server.id == server_id)
         result = await db.execute(query)
