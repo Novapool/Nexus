@@ -48,8 +48,8 @@
     function initTerminal(): void {
         const win = window as any;
         const Terminal = win.Terminal;
-        const FitAddon = win.FitAddon;
-        const WebLinksAddon = win.WebLinksAddon;
+        const FitAddon = win.FitAddon?.FitAddon || win.FitAddon;
+        const WebLinksAddon = win.WebLinksAddon?.WebLinksAddon || win.WebLinksAddon;
         
         terminal = new Terminal({
             cursorBlink: true,
@@ -192,6 +192,18 @@
                         if (terminal) {
                             terminal.writeln('\r\n\x1b[32mReconnected to session\x1b[0m\r\n');
                         }
+                        break;
+                        
+                    case 'keepalive':
+                        // Server sent keepalive, respond with pong
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'pong' }));
+                        }
+                        break;
+                        
+                    case 'pong':
+                        // Server responded to our ping
+                        console.debug('Received pong from server');
                         break;
                 }
             };

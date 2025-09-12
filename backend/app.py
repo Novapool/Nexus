@@ -1,5 +1,5 @@
 """
-Simple FastAPI application with SSH Terminal WebSocket support
+Simple FastAPI application with SSH Terminal WebSocket support - FIXED VERSION
 This is a minimal implementation to get you started
 """
 
@@ -87,24 +87,43 @@ async def websocket_terminal(websocket: WebSocket):
         while True:
             # Receive message from client
             try:
-                message = await websocket.receive_text()
+                # Add timeout to prevent hanging
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
                 data = json.loads(message)
-            except json.JSONDecodeError:
-                await websocket.send_text(json.dumps({
-                    'type': 'error',
-                    'message': 'Invalid JSON message'
-                }))
+                
+                # Don't log keepalive messages to reduce noise
+                if data.get('type') != 'ping':
+                    logger.info(f"Received message: {data}")
+            except asyncio.TimeoutError:
+                logger.warning("WebSocket receive timeout - sending keepalive")
+                # Send keepalive to check if connection is still alive
+                try:
+                    await websocket.send_text(json.dumps({'type': 'keepalive'}))
+                except:
+                    logger.error("Failed to send keepalive - connection lost")
+                    break
+                continue
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                try:
+                    await websocket.send_text(json.dumps({
+                        'type': 'error',
+                        'message': 'Invalid JSON message'
+                    }))
+                except:
+                    break
                 continue
             except Exception as e:
                 logger.error(f"Error receiving WebSocket message: {e}")
                 break
             
             msg_type = data.get('type')
-            logger.info(f"Received message type: {msg_type}")
+            logger.info(f"Processing message type: {msg_type}")
             
             if msg_type == 'connect':
                 # Create new SSH session
                 try:
+                    logger.info(f"Creating SSH session to {data['host']}:{data.get('port', 22)}")
                     session_id = await terminal_manager.create_session(
                         host=data['host'],
                         port=data.get('port', 22),
@@ -116,16 +135,26 @@ async def websocket_terminal(websocket: WebSocket):
                     current_session = terminal_manager.get_session(session_id)
                     if current_session:
                         current_session.websocket = websocket
+                        logger.info(f"Session {session_id} created and websocket attached")
                         
-                    await websocket.send_text(json.dumps({
-                        'type': 'connected',
-                        'session_id': session_id
-                    }))
-                    
-                    logger.info(f"WebSocket connected to SSH session {session_id}")
+                        # Wait a bit longer for SSH to fully initialize
+                        await asyncio.sleep(0.5)
+                        
+                        await websocket.send_text(json.dumps({
+                            'type': 'connected',
+                            'session_id': session_id
+                        }))
+                        
+                        logger.info(f"WebSocket connected to SSH session {session_id}")
+                    else:
+                        logger.error("Failed to retrieve created session")
+                        await websocket.send_text(json.dumps({
+                            'type': 'error',
+                            'message': 'Failed to retrieve session'
+                        }))
                     
                 except Exception as e:
-                    logger.error(f"Failed to create SSH session: {e}")
+                    logger.error(f"Failed to create SSH session: {e}", exc_info=True)
                     await websocket.send_text(json.dumps({
                         'type': 'error',
                         'message': f'Failed to connect: {str(e)}'
@@ -133,9 +162,11 @@ async def websocket_terminal(websocket: WebSocket):
                     
             elif msg_type == 'input':
                 # Send input to SSH session
-                if current_session:
+                if current_session and current_session.is_connected:
                     try:
-                        await current_session.send_input(data['data'])
+                        input_data = data.get('data', '')
+                        logger.debug(f"Sending input: {repr(input_data)}")
+                        await current_session.send_input(input_data)
                     except Exception as e:
                         logger.error(f"Error sending input: {e}")
                         await websocket.send_text(json.dumps({
@@ -143,6 +174,7 @@ async def websocket_terminal(websocket: WebSocket):
                             'message': f'Error sending input: {str(e)}'
                         }))
                 else:
+                    logger.warning("No active session for input")
                     await websocket.send_text(json.dumps({
                         'type': 'error',
                         'message': 'No active session'
@@ -150,12 +182,12 @@ async def websocket_terminal(websocket: WebSocket):
                     
             elif msg_type == 'resize':
                 # Resize terminal
-                if current_session:
+                if current_session and current_session.is_connected:
                     try:
-                        await current_session.resize(
-                            cols=data.get('cols', 80),
-                            rows=data.get('rows', 24)
-                        )
+                        cols = data.get('cols', 80)
+                        rows = data.get('rows', 24)
+                        logger.debug(f"Resizing terminal to {cols}x{rows}")
+                        await current_session.resize(cols, rows)
                     except Exception as e:
                         logger.error(f"Error resizing terminal: {e}")
                         
@@ -164,27 +196,44 @@ async def websocket_terminal(websocket: WebSocket):
                 session_id = data.get('session_id')
                 if session_id:
                     current_session = terminal_manager.get_session(session_id)
-                    if current_session:
+                    if current_session and current_session.is_connected:
                         current_session.websocket = websocket
                         await websocket.send_text(json.dumps({
                             'type': 'reconnected',
                             'session_id': session_id
                         }))
+                        logger.info(f"Reconnected to session {session_id}")
                     else:
                         await websocket.send_text(json.dumps({
                             'type': 'error',
-                            'message': 'Session not found'
+                            'message': 'Session not found or disconnected'
                         }))
+                        
+            elif msg_type == 'ping':
+                # Respond to ping with pong
+                try:
+                    await websocket.send_text(json.dumps({'type': 'pong'}))
+                except:
+                    break
+                    
+            elif msg_type == 'pong':
+                # Client responded to our keepalive
+                logger.debug("Received pong from client")
+                        
             else:
-                await websocket.send_text(json.dumps({
-                    'type': 'error',
-                    'message': f'Unknown message type: {msg_type}'
-                }))
+                logger.warning(f"Unknown message type: {msg_type}")
+                try:
+                    await websocket.send_text(json.dumps({
+                        'type': 'error',
+                        'message': f'Unknown message type: {msg_type}'
+                    }))
+                except:
+                    break
                         
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected normally")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.error(f"WebSocket error: {e}", exc_info=True)
         try:
             await websocket.send_text(json.dumps({
                 'type': 'error',
