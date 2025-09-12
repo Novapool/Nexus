@@ -4,8 +4,7 @@ This is a minimal implementation to get you started
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 import uvicorn
 import asyncio
 import logging
@@ -82,13 +81,26 @@ async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()
     current_session = None
     
+    logger.info("WebSocket connection accepted")
+    
     try:
         while True:
             # Receive message from client
-            message = await websocket.receive_text()
-            data = json.loads(message)
+            try:
+                message = await websocket.receive_text()
+                data = json.loads(message)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    'type': 'error',
+                    'message': 'Invalid JSON message'
+                }))
+                continue
+            except Exception as e:
+                logger.error(f"Error receiving WebSocket message: {e}")
+                break
             
             msg_type = data.get('type')
+            logger.info(f"Received message type: {msg_type}")
             
             if msg_type == 'connect':
                 # Create new SSH session
@@ -122,7 +134,14 @@ async def websocket_terminal(websocket: WebSocket):
             elif msg_type == 'input':
                 # Send input to SSH session
                 if current_session:
-                    await current_session.send_input(data['data'])
+                    try:
+                        await current_session.send_input(data['data'])
+                    except Exception as e:
+                        logger.error(f"Error sending input: {e}")
+                        await websocket.send_text(json.dumps({
+                            'type': 'error',
+                            'message': f'Error sending input: {str(e)}'
+                        }))
                 else:
                     await websocket.send_text(json.dumps({
                         'type': 'error',
@@ -132,11 +151,14 @@ async def websocket_terminal(websocket: WebSocket):
             elif msg_type == 'resize':
                 # Resize terminal
                 if current_session:
-                    await current_session.resize(
-                        cols=data.get('cols', 80),
-                        rows=data.get('rows', 24)
-                    )
-                    
+                    try:
+                        await current_session.resize(
+                            cols=data.get('cols', 80),
+                            rows=data.get('rows', 24)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error resizing terminal: {e}")
+                        
             elif msg_type == 'reconnect':
                 # Reconnect to existing session
                 session_id = data.get('session_id')
@@ -153,9 +175,14 @@ async def websocket_terminal(websocket: WebSocket):
                             'type': 'error',
                             'message': 'Session not found'
                         }))
+            else:
+                await websocket.send_text(json.dumps({
+                    'type': 'error',
+                    'message': f'Unknown message type: {msg_type}'
+                }))
                         
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
+        logger.info("WebSocket disconnected normally")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         try:
@@ -170,6 +197,7 @@ async def websocket_terminal(websocket: WebSocket):
         if current_session:
             current_session.websocket = None
             # Don't close SSH session on WebSocket disconnect - allow reconnection
+        logger.info("WebSocket connection closed")
 
 if __name__ == "__main__":
     # Run the application

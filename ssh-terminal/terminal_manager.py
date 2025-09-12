@@ -25,7 +25,7 @@ class SSHTerminalSession:
         self.key_path = key_path
         
         self.connection: Optional[asyncssh.SSHClientConnection] = None
-        self.channel: Optional[asyncssh.SSHClientChannel] = None
+        self.process: Optional[asyncssh.SSHClientProcess] = None
         self.websocket = None
         self.is_connected = False
         self.created_at = datetime.utcnow()
@@ -50,20 +50,17 @@ class SSHTerminalSession:
             # Establish connection
             self.connection = await asyncssh.connect(**connect_kwargs)
             
-            # Create interactive shell with PTY
-            self.channel = await self.connection.create_session(
+            # Create interactive shell process with PTY
+            self.process = await self.connection.create_process(
                 term_type='xterm-256color',
-                term_size=(80, 24)
+                term_size=(80, 24),
+                encoding='utf-8'
             )
-            
-            # Start shell
-            await self.channel.request_pty()
-            await self.channel.request_shell()
             
             self.is_connected = True
             logger.info(f"SSH session {self.session_id} connected to {self.host}")
             
-            # Start reading from SSH channel
+            # Start reading from SSH process
             asyncio.create_task(self._read_ssh_output())
             
             return True
@@ -74,41 +71,66 @@ class SSHTerminalSession:
             raise
     
     async def _read_ssh_output(self):
-        """Continuously read output from SSH channel and send to WebSocket"""
+        """Continuously read output from SSH process and send to WebSocket"""
         try:
-            while self.is_connected and self.channel:
-                # Read data from SSH channel
-                data = await self.channel.read(1024)
-                if not data:
+            while self.is_connected and self.process:
+                # Read data from SSH process stdout
+                try:
+                    data = await self.process.stdout.read(1024)
+                    if not data:
+                        break
+                    
+                    # Decode bytes to string if needed
+                    if isinstance(data, bytes):
+                        data = data.decode('utf-8', errors='replace')
+                    
+                    # Send to WebSocket if connected
+                    if self.websocket:
+                        await self.websocket.send_text(json.dumps({
+                            'type': 'output',
+                            'data': data
+                        }))
+                        
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"Error reading SSH stdout for session {self.session_id}: {e}")
+                    # Try to read stderr as well
+                    try:
+                        stderr_data = await self.process.stderr.read(1024)
+                        if stderr_data:
+                            if isinstance(stderr_data, bytes):
+                                stderr_data = stderr_data.decode('utf-8', errors='replace')
+                            
+                            if self.websocket:
+                                await self.websocket.send_text(json.dumps({
+                                    'type': 'output',
+                                    'data': stderr_data
+                                }))
+                    except:
+                        pass
                     break
                     
-                # Send to WebSocket if connected
-                if self.websocket:
-                    await self.websocket.send_text(json.dumps({
-                        'type': 'output',
-                        'data': data
-                    }))
-                    
         except Exception as e:
-            logger.error(f"Error reading SSH output for session {self.session_id}: {e}")
+            logger.error(f"Error in SSH output reader for session {self.session_id}: {e}")
         finally:
             await self.disconnect()
     
     async def send_input(self, data: str):
-        """Send input to SSH channel"""
-        if self.channel and self.is_connected:
+        """Send input to SSH process"""
+        if self.process and self.is_connected:
             try:
-                self.channel.write(data)
-                await self.channel.drain()
+                self.process.stdin.write(data)
+                await self.process.stdin.drain()
             except Exception as e:
                 logger.error(f"Error sending input to SSH session {self.session_id}: {e}")
                 await self.disconnect()
     
     async def resize(self, cols: int, rows: int):
         """Resize terminal window"""
-        if self.channel and self.is_connected:
+        if self.process and self.is_connected:
             try:
-                self.channel.change_terminal_size(cols, rows)
+                self.process.change_terminal_size(cols, rows)
                 logger.debug(f"Resized terminal for session {self.session_id} to {cols}x{rows}")
             except Exception as e:
                 logger.error(f"Error resizing terminal for session {self.session_id}: {e}")
@@ -117,14 +139,20 @@ class SSHTerminalSession:
         """Close SSH connection and cleanup"""
         self.is_connected = False
         
-        if self.channel:
-            self.channel.close()
-            await self.channel.wait_closed()
-            self.channel = None
+        if self.process:
+            try:
+                self.process.terminate()
+                await self.process.wait()
+            except:
+                pass
+            self.process = None
             
         if self.connection:
             self.connection.close()
-            await self.connection.wait_closed()
+            try:
+                await self.connection.wait_closed()
+            except:
+                pass
             self.connection = None
             
         logger.info(f"SSH session {self.session_id} disconnected")
