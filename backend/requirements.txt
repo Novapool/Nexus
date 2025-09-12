@@ -19,8 +19,8 @@ websockets==12.0
 cryptography>=41.0.0,<46.0.0
 python-dotenv==1.0.0
 
-# AI Integration (1)
-ollama==0.1.2  # For Ollama API integration (correct package name)
+# AI Integration (1) - Ready for Phase 2
+ollama==0.1.2  # For Ollama API integration (gpt-oss:20b)
 
 # Development & Testing (13) - Enhanced testing support
 pytest==7.4.3
