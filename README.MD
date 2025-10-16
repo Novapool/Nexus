@@ -20,13 +20,15 @@
 
 Nexus is an AI-powered SSH terminal management tool that combines **live terminal access** with **intelligent AI assistance**. Users can manage multiple servers through both direct SSH terminal access and natural language commands processed by a local AI model.
 
-### ✨ **Current Status: Phase 2.1 - Svelte Migration Complete (95%)**
+### ✨ **Current Status: Phase 2 - AI Integration Complete (87%)**
 
 - ✅ **Live SSH Terminal** - Fully functional with WebSocket support
-- ✅ **Professional UI** - Modern Svelte frontend with responsive design  
+- ✅ **Professional UI** - Modern Svelte frontend with responsive design
 - ✅ **Real-time Communication** - WebSocket protocol for terminal I/O
 - ✅ **Connection Management** - Multi-server support with session handling
-- 🔄 **AI Chat Integration** - Ready for Ollama (gpt-oss:20b) integration
+- ✅ **AI Chat Integration** - Working Ollama (gpt-oss:20b) integration with streaming responses
+- ✅ **Command Generation** - AI detects and suggests commands with safety validation
+- ⚠️ **Security Hardening** - Minor improvements needed for production readiness
 
 ---
 
@@ -46,18 +48,18 @@ FastAPI Backend (Port 8000)
 SSH Servers (Any host/port)
 ```
 
-### **Next Phase Architecture (Phase 2.2)**
+### **Current Full Architecture (Phase 2 Complete)**
 ```
-Svelte Frontend
+Svelte Frontend (Port 5173)
     ├── WebSocket: /ws/terminal → SSH Terminal
-    └── WebSocket: /ws/ai → AI Chat (Coming Soon)
+    └── WebSocket: /ws/ai → AI Chat ✅
             ↓
-FastAPI Backend
+FastAPI Backend (Port 8000)
     ├── SSH Manager (✅ Complete)
-    ├── AI Manager (🔄 In Progress)
-    └── Context Manager (🔄 Planned)
+    ├── AI Manager (✅ Complete)
+    └── Context Manager (✅ Integrated)
             ↓
-    ├── SSH Servers
+    ├── SSH Servers (Any host/port)
     └── Ollama (gpt-oss:20b)
 ```
 
@@ -113,12 +115,13 @@ cd frontend && npm run dev
 - **Connection status monitoring** with auto-reconnect
 - **Responsive design** for desktop and mobile
 
-### **🤖 AI Assistant (Phase 2.2 - Coming Soon)**
-- **Natural language commands** - "Check disk space on all servers"
-- **Intelligent command generation** with safety validation
-- **Context-aware responses** using server information
-- **Local AI processing** with Ollama (gpt-oss:20b)
-- **Safety levels** from paranoid to permissive
+### **🤖 AI Assistant (Phase 2.2 - Available Now)**
+- ✅ **Natural language commands** - "Check disk space on all servers"
+- ✅ **Intelligent command generation** with safety validation
+- ✅ **Context-aware responses** using server information
+- ✅ **Local AI processing** with Ollama (gpt-oss:20b)
+- ✅ **Streaming chat interface** with real-time responses
+- ✅ **Command detection and execution** with safety levels
 
 ### **🔒 Security & Safety (Phase 3 - Planned)**
 - **Multi-level safety system** with command validation
@@ -210,15 +213,22 @@ vim config.txt
 - **Connection status**: Real-time monitoring of connection health
 - **Quick disconnect**: One-click session termination
 
-### **4. AI Assistant (Coming in Phase 2.2)**
+### **4. AI Assistant (Available Now)**
 
 ```
 You: "Check disk space on all servers"
 AI: I'll check disk usage. Here's the command:
     df -h
-    
-Execute? [Yes/No/Modify]
+
+[Execute] [Cancel] (Safety: Safe ✓)
 ```
+
+**Features:**
+- Natural language server management
+- Real-time streaming AI responses
+- Command detection with safety levels (Safe/Caution/Dangerous)
+- One-click command execution to terminal
+- Context-aware suggestions based on terminal session
 
 ---
 
@@ -228,13 +238,16 @@ Execute? [Yes/No/Modify]
 nexus/
 ├── backend/                    # FastAPI Backend
 │   ├── app.py                 # Main FastAPI application
-│   ├── terminal_manager.py    # SSH session management  
+│   ├── terminal_manager.py    # SSH session management
+│   ├── ai_manager.py          # AI session management (NEW)
 │   ├── requirements.txt       # Python dependencies
 │   └── terminal.html         # Legacy HTML (backup)
 ├── frontend/                  # Svelte Frontend
 │   ├── src/
 │   │   ├── routes/+page.svelte    # Main application page
-│   │   ├── lib/Terminal.svelte    # Terminal component
+│   │   ├── lib/
+│   │   │   ├── Terminal.svelte    # Terminal component
+│   │   │   └── AIChat.svelte      # AI Chat component (NEW)
 │   │   └── app.html              # HTML template
 │   ├── package.json           # Node.js dependencies
 │   └── vite.config.ts        # Vite configuration with proxy
@@ -254,10 +267,10 @@ NEXUS_HOST=0.0.0.0          # Backend host
 NEXUS_PORT=8000             # Backend port  
 NEXUS_LOG_LEVEL=info        # Logging level
 
-# AI Configuration (Phase 2.2)
-OLLAMA_HOST=localhost       # Ollama host
-OLLAMA_PORT=11434          # Ollama port
-AI_MODEL=gpt-oss:20b       # AI model name
+# AI Configuration (Available Now)
+OLLAMA_HOST=localhost       # Ollama host (default)
+OLLAMA_PORT=11434          # Ollama port (default)
+AI_MODEL=gpt-oss:20b       # AI model name (requires Ollama)
 ```
 
 ### **Proxy Configuration**
@@ -286,25 +299,30 @@ server: {
 - ✅ Connection management and session handling
 - ✅ Professional UI with status indicators
 
-### **🔄 Phase 2: AI Chat Integration - IN PROGRESS (15%)**
+### **🔄 Phase 2: AI Chat Integration - IN PROGRESS (87%)**
 
-#### **2.1 Frontend Framework Migration - COMPLETE ✅**
+#### **2.1 Frontend Framework Migration - COMPLETE ✅ (100%)**
 - ✅ Convert HTML/CSS/JS to Svelte components
 - ✅ Create responsive layout: Terminal + AI Chat panels
 - ✅ Maintain all existing terminal functionality
 - ✅ Add collapsible panel support
 
-#### **2.2 AI Chat Interface - NEXT (0%)**
-- 🔄 Chat UI component with message history  
-- 🔄 WebSocket endpoint for AI communication (`/ws/ai`)
-- 🔄 Integration with Ollama (gpt-oss:20b)
-- 🔄 Message parsing and command generation
+#### **2.2 AI Chat Interface - COMPLETE ✅ (90%)**
+- ✅ Chat UI component with message history
+- ✅ WebSocket endpoint for AI communication (`/ws/ai`)
+- ✅ Integration with Ollama (gpt-oss:20b)
+- ✅ Message parsing and command generation
+- ✅ Streaming response display
+- ✅ Command detection and safety warnings
+- ⚠️ Minor fixes needed (Python 3.8 compatibility, security hardening)
 
-#### **2.3 Backend AI Integration - PLANNED (0%)**
-- 🔄 AI service integration (`ai_manager.py`)
-- 🔄 Ollama client setup and configuration
-- 🔄 Command generation and safety validation
-- 🔄 Server context collection and caching
+#### **2.3 Backend AI Integration - COMPLETE ✅ (85%)**
+- ✅ AI service integration (`ai_manager.py`)
+- ✅ Ollama client setup and configuration
+- ✅ Command generation and safety validation
+- ✅ Server context collection and caching
+- ✅ Multi-session management
+- ⚠️ Security improvements needed (rate limiting, command validation)
 
 ### **📋 Phase 3: Advanced Features - PLANNED (0%)**
 - 🔄 Multi-server support with dropdown selection
@@ -377,20 +395,23 @@ isort .
 ## 🎯 Next Steps
 
 ### **Immediate Priority (This Week)**
-1. **AI Backend Integration**
-   - Set up Ollama client in FastAPI
-   - Create `/ws/ai` WebSocket endpoint
-   - Implement basic AI chat functionality
+1. **Security Hardening** ⚠️
+   - Fix Python 3.8 compatibility issue (`asyncio.timeout` → `asyncio.wait_for`)
+   - Add command validation whitelist/blacklist system
+   - Implement rate limiting for AI requests
+   - Strengthen prompt injection defenses
 
-2. **Connect AI to Terminal**
-   - Command generation from AI responses
-   - Execute commands in active SSH session
-   - Display results in both terminal and chat
+2. **Code Quality Improvements**
+   - Reduce WebSocket handler duplication
+   - Remove circular import in `ai_manager.py`
+   - Simplify error handling patterns
+   - Add unit tests for command safety assessment
 
 ### **This Month**
-1. **Server Context Collection** - Gather system information automatically
-2. **Safety System** - Implement command validation and approval workflow
-3. **Multi-server Support** - Connection management with server profiles
+1. **Enhanced Multi-server Support** - Server profiles with credential storage
+2. **Audit Logging** - Track all AI-generated commands and executions
+3. **Documentation** - Add API documentation and usage guides
+4. **Testing** - Comprehensive test suite for AI and terminal integration
 
 ---
 

@@ -10,10 +10,9 @@ aiosqlite==0.19.0
 alembic==1.12.1
 greenlet>=2.0.2,<4.0.0  # Fixes greenlet warnings and async support
 
-# Network & SSH (3)
+# Network & SSH (2)
 httpx==0.25.2
 asyncssh==2.14.2
-websockets==12.0
 
 # Security (2)
 cryptography>=41.0.0,<46.0.0

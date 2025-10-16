@@ -1,25 +1,43 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    
-    // State variables with proper types
-    let terminal: any = null;
-    let fitAddon: any = null;
-    let ws: WebSocket | null = null;
-    let sessionId: string | null = null;
-    let isConnected: boolean = false;
-    let isConnecting: boolean = false;
-    
-    // Form values with proper types
-    let host: string = '';
-    let port: number = 22;
-    let username: string = '';
-    let password: string = '';
-    
-    // Status with proper types
-    let statusIndicator: string = 'disconnected';
-    let statusText: string = 'Disconnected';
-    
-    // DOM element reference with proper type
+
+    // Props
+    type Props = {
+        onSessionChange?: (sessionId: string | null) => void;
+    };
+
+    let { onSessionChange }: Props = $props();
+
+    // WebSocket message types for type safety
+    type WSMessage =
+        | { type: 'connected'; session_id: string }
+        | { type: 'output'; data: string }
+        | { type: 'error'; message: string }
+        | { type: 'reconnected'; session_id: string }
+        | { type: 'keepalive' }
+        | { type: 'pong' };
+
+    type StatusType = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+    // State variables using Svelte 5 $state rune
+    let terminal = $state<any>(null);
+    let fitAddon = $state<any>(null);
+    let ws = $state<WebSocket | null>(null);
+    let sessionId = $state<string | null>(null);
+    let isConnected = $state(false);
+    let isConnecting = $state(false);
+
+    // Form values
+    let host = $state('');
+    let port = $state(22);
+    let username = $state('');
+    let password = $state('');
+
+    // Status
+    let statusIndicator = $state<StatusType>('disconnected');
+    let statusText = $state('Disconnected');
+
+    // DOM element reference (doesn't need $state)
     let terminalElement: HTMLDivElement;
     
     onMount(() => {
@@ -156,8 +174,8 @@
             };
             
             ws.onmessage = (event: MessageEvent) => {
-                const message = JSON.parse(event.data);
-                
+                const message = JSON.parse(event.data) as WSMessage;
+
                 switch (message.type) {
                     case 'connected':
                         sessionId = message.session_id;
@@ -167,6 +185,10 @@
                         if (terminal) {
                             terminal.writeln('\r\n\x1b[32mConnected successfully!\x1b[0m\r\n');
                             terminal.focus();
+                        }
+                        // Notify parent of session change
+                        if (onSessionChange) {
+                            onSessionChange(sessionId);
                         }
                         break;
                         
@@ -215,16 +237,24 @@
                 isConnecting = false;
             };
             
-            ws.onclose = () => {
-                if (isConnected) {
-                    updateStatus('disconnected', 'Disconnected');
-                    if (terminal) {
-                        terminal.writeln('\r\n\x1b[33mConnection closed\x1b[0m\r\n');
-                    }
-                }
+            ws.onclose = (event: CloseEvent) => {
+                const wasConnected = isConnected;
                 isConnected = false;
                 isConnecting = false;
                 ws = null;
+
+                if (wasConnected) {
+                    // Distinguish normal vs abnormal close
+                    if (event.code === 1000) {
+                        // Normal close
+                        updateStatus('disconnected', 'Disconnected');
+                        terminal?.writeln('\r\n\x1b[33mConnection closed\x1b[0m\r\n');
+                    } else {
+                        // Abnormal close
+                        updateStatus('error', `Connection lost (${event.code})`);
+                        terminal?.writeln(`\r\n\x1b[31mConnection lost: ${event.reason || 'Unknown error'}\x1b[0m\r\n`);
+                    }
+                }
             };
             
         } catch (error) {
@@ -243,6 +273,21 @@
         isConnected = false;
         sessionId = null;
         updateStatus('disconnected', 'Disconnected');
+        // Notify parent of session change
+        if (onSessionChange) {
+            onSessionChange(null);
+        }
+    }
+
+    // Public method to send a command to the terminal
+    export function sendCommand(command: string): void {
+        if (ws && ws.readyState === WebSocket.OPEN && isConnected) {
+            // Send command with newline
+            ws.send(JSON.stringify({
+                type: 'input',
+                data: command + '\n'
+            }));
+        }
     }
     
     function clearTerminal(): void {
@@ -264,7 +309,7 @@
         }
     }
     
-    function updateStatus(status: string, text: string): void {
+    function updateStatus(status: StatusType, text: string): void {
         statusIndicator = status;
         statusText = text;
     }

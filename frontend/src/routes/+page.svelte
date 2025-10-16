@@ -1,11 +1,23 @@
-<script>
+<script lang="ts">
     import Terminal from '../lib/Terminal.svelte';
-    
-    // Future: AI Chat component will go here
-    let showAiChat = false;
-    
+    import AIChat from '../lib/AIChat.svelte';
+
+    let showAiChat = $state(false);
+    let terminalSessionId = $state<string | null>(null);
+    let terminalComponent: Terminal;
+
     function toggleAiChat() {
         showAiChat = !showAiChat;
+    }
+
+    function handleSessionChange(sessionId: string | null) {
+        terminalSessionId = sessionId;
+    }
+
+    function handleExecuteCommand(command: string) {
+        if (terminalComponent && terminalSessionId) {
+            terminalComponent.sendCommand(command);
+        }
     }
 </script>
 
@@ -36,24 +48,6 @@
         border-left: 1px solid #3a3a3a;
         display: flex;
         flex-direction: column;
-    }
-    
-    .ai-panel-header {
-        padding: 1rem;
-        border-bottom: 1px solid #3a3a3a;
-        color: #e0e0e0;
-        font-weight: 600;
-    }
-    
-    .ai-panel-content {
-        flex: 1;
-        padding: 1rem;
-        color: #e0e0e0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-style: italic;
-        opacity: 0.7;
     }
     
     .toggle-button {
@@ -92,27 +86,19 @@
 
 <div class="app-container">
     <div class="terminal-panel">
-        <Terminal />
+        <Terminal bind:this={terminalComponent} onSessionChange={handleSessionChange} />
     </div>
-    
+
     {#if showAiChat}
         <div class="ai-panel">
-            <div class="ai-panel-header">
-                AI Assistant
-                <button 
-                    style="float: right; background: transparent; border: none; color: #e0e0e0; cursor: pointer;" 
-                    on:click={toggleAiChat}
-                >
-                    ✕
-                </button>
-            </div>
-            <div class="ai-panel-content">
-                AI Chat coming in Phase 2.2...
-            </div>
+            <AIChat
+                terminalSessionId={terminalSessionId}
+                onExecuteCommand={handleExecuteCommand}
+            />
         </div>
     {/if}
-    
-    <button class="toggle-button" on:click={toggleAiChat}>
+
+    <button class="toggle-button" onclick={toggleAiChat}>
         {showAiChat ? 'Hide AI' : 'Show AI'}
     </button>
 </div>

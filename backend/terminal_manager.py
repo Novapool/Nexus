@@ -5,13 +5,21 @@ Provides real interactive terminal sessions via WebSockets
 
 import asyncio
 import asyncssh
-import json
 import uuid
 from typing import Dict, Optional
 from datetime import datetime
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+class SSHConnectionError(Exception):
+    """Raised when SSH connection fails"""
+    pass
+
+class SSHAuthenticationError(SSHConnectionError):
+    """Raised when SSH authentication fails"""
+    pass
 
 class SSHTerminalSession:
     """Manages a single SSH terminal session"""
@@ -35,11 +43,14 @@ class SSHTerminalSession:
         """Establish SSH connection and create interactive shell"""
         try:
             # Connection options
+            # Use known_hosts file for security (defaults to ~/.ssh/known_hosts)
+            known_hosts_path = Path.home() / '.ssh' / 'known_hosts'
+
             connect_kwargs = {
                 'host': self.host,
                 'port': self.port,
                 'username': self.username,
-                'known_hosts': None,  # Disable host key checking for now
+                'known_hosts': str(known_hosts_path) if known_hosts_path.exists() else None,
             }
             
             # Add authentication
@@ -49,13 +60,19 @@ class SSHTerminalSession:
                 connect_kwargs['client_keys'] = [self.key_path]
             
             # Establish connection
-            self.connection = await asyncssh.connect(**connect_kwargs)
+            try:
+                self.connection = await asyncssh.connect(**connect_kwargs)
+            except asyncssh.PermissionDenied as e:
+                raise SSHAuthenticationError("Authentication failed") from e
+            except asyncssh.Error as e:
+                raise SSHConnectionError(f"Connection failed: {e}") from e
             
             # Create interactive shell process with PTY
             self.process = await self.connection.create_process(
                 term_type='xterm-256color',
                 term_size=(80, 24),
-                encoding=None  # Handle encoding manually to avoid issues
+                encoding='utf-8',  # Let AsyncSSH handle encoding automatically
+                errors='replace'   # Replace invalid UTF-8 sequences
             )
             
             self.is_connected = True
@@ -64,106 +81,63 @@ class SSHTerminalSession:
             # Start reading from SSH process
             self._output_task = asyncio.create_task(self._read_ssh_output())
             
-            # Give the shell time to initialize and send initial prompt
-            await asyncio.sleep(1.0)
-            
-            # Send a newline to trigger the shell prompt if needed
-            try:
-                self.process.stdin.write(b'\r')
-                await self.process.stdin.drain()
-                logger.debug(f"Sent initial carriage return to trigger prompt for session {self.session_id}")
-            except Exception as e:
-                logger.warning(f"Could not send initial prompt trigger: {e}")
-            
             return True
-            
+
+        except (SSHConnectionError, SSHAuthenticationError):
+            self.is_connected = False
+            raise
         except Exception as e:
             logger.error(f"Failed to connect SSH session {self.session_id}: {e}")
             self.is_connected = False
-            raise
+            raise SSHConnectionError(f"Unexpected error: {e}") from e
     
     async def _read_ssh_output(self):
         """Continuously read output from SSH process and send to WebSocket"""
         try:
-            buffer = b''
             while self.is_connected and self.process:
                 try:
-                    # Read data from SSH process stdout with longer timeout
+                    # Read data from SSH process stdout
+                    # AsyncSSH handles encoding automatically now
                     data = await asyncio.wait_for(self.process.stdout.read(4096), timeout=1.0)
-                    
+
                     if not data:
                         # EOF reached
                         logger.info(f"SSH process EOF reached for session {self.session_id}")
                         break
-                    
-                    # Add to buffer
-                    buffer += data
-                    
-                    # Process complete lines/chunks
-                    while buffer:
-                        # Try to decode what we have
+
+                    # Send to WebSocket if we have data
+                    if self.websocket and data:
                         try:
-                            decoded_data = buffer.decode('utf-8')
-                            buffer = b''  # Clear buffer if successful
-                        except UnicodeDecodeError as e:
-                            # If we can't decode, try to decode up to the error point
-                            if e.start > 0:
-                                decoded_data = buffer[:e.start].decode('utf-8', errors='replace')
-                                buffer = buffer[e.start:]
-                            else:
-                                # Skip the problematic byte
-                                decoded_data = buffer[:1].decode('utf-8', errors='replace')
-                                buffer = buffer[1:]
-                        
-                        # Send to WebSocket if we have data
-                        if self.websocket and decoded_data:
-                            try:
-                                await self.websocket.send_text(json.dumps({
-                                    'type': 'output',
-                                    'data': decoded_data
-                                }))
-                                logger.debug(f"Sent {len(decoded_data)} chars to WebSocket for session {self.session_id}")
-                            except Exception as e:
-                                logger.error(f"Error sending to WebSocket: {e}")
-                                return
-                        
-                        # Break if buffer is empty
-                        if not buffer:
-                            break
-                        
+                            await self.websocket.send_json({
+                                'type': 'output',
+                                'data': data
+                            })
+                            logger.debug(f"Sent {len(data)} chars to WebSocket for session {self.session_id}")
+                        except Exception as e:
+                            logger.error(f"Error sending to WebSocket: {e}")
+                            return
+
                 except asyncio.TimeoutError:
-                    # No data available, send keepalive if needed
-                    if self.websocket:
-                        try:
-                            await self.websocket.send_text(json.dumps({
-                                'type': 'keepalive'
-                            }))
-                        except:
-                            pass
+                    # No data available - timeout is normal
                     continue
                 except asyncio.CancelledError:
                     logger.info(f"Output reader cancelled for session {self.session_id}")
                     break
                 except Exception as e:
                     logger.error(f"Error reading SSH stdout for session {self.session_id}: {e}")
-                    
+
                     # Try to read stderr as well
                     try:
                         stderr_data = await asyncio.wait_for(self.process.stderr.read(1024), timeout=0.1)
-                        if stderr_data:
-                            try:
-                                stderr_decoded = stderr_data.decode('utf-8', errors='replace')
-                                if self.websocket:
-                                    await self.websocket.send_text(json.dumps({
-                                        'type': 'output',
-                                        'data': stderr_decoded
-                                    }))
-                            except:
-                                pass
-                    except:
+                        if stderr_data and self.websocket:
+                            await self.websocket.send_json({
+                                'type': 'output',
+                                'data': stderr_data
+                            })
+                    except Exception:
                         pass
                     break
-                    
+
         except Exception as e:
             logger.error(f"Error in SSH output reader for session {self.session_id}: {e}")
         finally:
@@ -173,11 +147,10 @@ class SSHTerminalSession:
         """Send input to SSH process"""
         if self.process and self.is_connected:
             try:
-                # Encode the string to bytes
-                data_bytes = data.encode('utf-8')
-                self.process.stdin.write(data_bytes)
+                # Write string directly - AsyncSSH handles encoding
+                self.process.stdin.write(data)
                 await self.process.stdin.drain()
-                logger.debug(f"Sent {len(data_bytes)} bytes to SSH session {self.session_id}")
+                logger.debug(f"Sent {len(data)} chars to SSH session {self.session_id}")
             except Exception as e:
                 logger.error(f"Error sending input to SSH session {self.session_id}: {e}")
                 # Don't disconnect on input error, let user retry
