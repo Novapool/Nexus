@@ -111,8 +111,8 @@ command here
         """Stream response from Ollama with timeout handling (Python 3.8 compatible)"""
         client = AsyncClient()
 
-        # Note: client.chat() with stream=True returns an async generator directly (no await)
-        stream = client.chat(model=self.model, messages=messages, stream=True)
+        # Note: client.chat() with stream=True needs to be awaited to get the async generator
+        stream = await client.chat(model=self.model, messages=messages, stream=True)
 
         full_response = ""
         start_time = asyncio.get_event_loop().time()
@@ -305,12 +305,8 @@ class AIManager:
     def __init__(self, terminal_manager=None):
         self.sessions: Dict[str, AISession] = {}
         self.terminal_manager = terminal_manager
-        # Schedule async connection check if event loop is running
-        try:
-            asyncio.create_task(self._check_ollama_connection())
-        except RuntimeError:
-            # No event loop running yet - will check on first use
-            logger.info("Event loop not running yet - Ollama connection will be checked on first use")
+        self._ollama_checked = False
+        logger.info("AIManager initialized - Ollama connection will be checked on first use")
 
     async def _check_ollama_connection(self):
         """Check if Ollama is accessible"""
@@ -323,8 +319,13 @@ class AIManager:
             logger.warning(f"Could not connect to Ollama: {e}")
             logger.warning("AI features may not work properly. Please ensure Ollama is running.")
 
-    def create_session(self, terminal_session_id: Optional[str] = None) -> str:
+    async def create_session(self, terminal_session_id: Optional[str] = None) -> str:
         """Create a new AI chat session"""
+        # Check Ollama connection on first session creation
+        if not self._ollama_checked:
+            await self._check_ollama_connection()
+            self._ollama_checked = True
+
         session_id = str(uuid.uuid4())
 
         session = AISession(

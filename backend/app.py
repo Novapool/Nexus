@@ -285,7 +285,7 @@ async def websocket_ai(websocket: WebSocket):
                     terminal_session_id = data.get('terminal_session_id')
                     logger.info(f"Creating AI session (terminal link: {terminal_session_id})")
 
-                    session_id = ai_manager.create_session(
+                    session_id = await ai_manager.create_session(
                         terminal_session_id=terminal_session_id
                     )
 
