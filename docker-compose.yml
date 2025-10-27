@@ -1,0 +1,88 @@
+# Docker Compose configuration for Nexus SSH Terminal
+# Orchestrates backend (FastAPI) and frontend (Nginx) services
+
+version: '3.8'
+
+services:
+  # ============================================
+  # Backend Service (FastAPI + AsyncSSH)
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      # Ollama configuration (connects to host)
+      - OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
+      - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+      - AI_MODEL=${AI_MODEL:-gpt-oss:20b}
+
+      # Application configuration
+      - NEXUS_HOST=0.0.0.0
+      - NEXUS_PORT=8000
+      - NEXUS_LOG_LEVEL=${LOG_LEVEL:-info}
+
+      # Python configuration
+      - PYTHONUNBUFFERED=1
+
+    # Allow backend to access host services (Ollama)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Development: Mount source for hot reload
+    volumes:
+      - ./backend:/app:ro
+
+    networks:
+      - nexus-network
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================
+  # Frontend Service (Nginx + Built Svelte)
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexus-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nexus-network
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  nexus-network:
+    driver: bridge
+    name: nexus-network
+
+# ============================================
+# Volumes (for future use)
+# ============================================
+volumes:
+  # Reserved for future database/config storage
+  nexus-data:
+    name: nexus-data

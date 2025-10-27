@@ -490,44 +490,44 @@
 <div class="terminal-container">
     <div class="header">
         <div class="connection-form">
-            <input 
-                type="text" 
+            <input
+                type="text"
                 bind:value={host}
-                placeholder="Host (e.g., 192.168.1.100)" 
-                on:keypress={handleKeyPress}
+                placeholder="Host (e.g., 192.168.1.100)"
+                onkeypress={handleKeyPress}
                 disabled={isConnecting}
             />
-            <input 
-                type="number" 
+            <input
+                type="number"
                 bind:value={port}
-                placeholder="Port" 
-                on:keypress={handleKeyPress}
+                placeholder="Port"
+                onkeypress={handleKeyPress}
                 disabled={isConnecting}
             />
-            <input 
-                type="text" 
+            <input
+                type="text"
                 bind:value={username}
-                placeholder="Username" 
-                on:keypress={handleKeyPress}
+                placeholder="Username"
+                onkeypress={handleKeyPress}
                 disabled={isConnecting}
             />
-            <input 
-                type="password" 
+            <input
+                type="password"
                 bind:value={password}
-                placeholder="Password" 
-                on:keypress={handleKeyPress}
+                placeholder="Password"
+                onkeypress={handleKeyPress}
                 disabled={isConnecting}
             />
             
             {#if !isConnected}
-                <button 
-                    on:click={connect}
+                <button
+                    onclick={connect}
                     disabled={isConnecting}
                 >
                     {isConnecting ? 'Connecting...' : 'Connect'}
                 </button>
             {:else}
-                <button on:click={disconnect}>
+                <button onclick={disconnect}>
                     Disconnect
                 </button>
             {/if}
@@ -544,9 +544,9 @@
     </div>
     
     <div class="controls">
-        <button on:click={clearTerminal}>Clear</button>
-        <button on:click={copySelection}>Copy</button>
-        
+        <button onclick={clearTerminal}>Clear</button>
+        <button onclick={copySelection}>Copy</button>
+
         <div class="session-info">
             {#if sessionId}
                 Session: {sessionId.substring(0, 8)}...

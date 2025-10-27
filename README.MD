@@ -67,12 +67,32 @@ FastAPI Backend (Port 8000)
 
 ## 🚀 Quick Start
 
-### **Prerequisites**
-- **Python 3.8+** with pip
-- **Node.js 18+** with npm
-- **SSH access** to target servers
+### **🐳 Docker Deployment (Recommended)**
 
-### **5-Minute Setup**
+**Prerequisites:** Docker & Ollama installed on your system
+
+```bash
+# 1. Install Ollama (AI engine)
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull gpt-oss:20b  # Download AI model (~12GB)
+
+# 2. Clone and start Nexus
+git clone <your-repo-url>
+cd nexus
+docker-compose up -d
+
+# 3. Open browser
+# http://localhost:3000
+```
+
+**🎉 Done! One command deployment!**
+📖 See [Docker Setup Guide](docs/DOCKER_SETUP.md) for details.
+
+---
+
+### **💻 Local Development Setup**
+
+**Prerequisites:** Python 3.8+, Node.js 18+, SSH access
 
 ```bash
 # 1. Clone the repository
@@ -86,7 +106,7 @@ source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 
-# 3. Frontend Setup  
+# 3. Frontend Setup
 cd ../frontend
 npm install
 
@@ -133,6 +153,30 @@ cd frontend && npm run dev
 
 ## 🛠️ Installation
 
+### **Docker Deployment (Recommended for Home Users)**
+
+The easiest way to deploy Nexus is with Docker:
+
+```bash
+# Install Docker (if not already installed)
+curl -fsSL https://get.docker.com | sh
+
+# Install Ollama AI engine
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull gpt-oss:20b
+
+# Clone and run
+git clone <your-repo-url>
+cd nexus
+docker-compose up -d
+```
+
+Access at: **http://localhost:3000**
+
+📖 **Full guide:** [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md)
+
+---
+
 ### **Development Environment**
 
 #### **Cross-Platform Setup**
@@ -170,12 +214,15 @@ npm run dev
 # Frontend runs on http://localhost:5173 with API proxy
 ```
 
-### **Docker Deployment (Phase 4 - Planned)**
+### **Docker Deployment (Available Now!)**
 
 ```bash
-# Coming Soon - Single command deployment
+# One command deployment - see Docker Setup Guide
 docker-compose up -d
+# Access at http://localhost:3000
 ```
+
+📖 **See:** [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md)
 
 ---
 
@@ -330,11 +377,13 @@ server: {
 - 🔄 Multi-level safety system (PARANOID/SAFE/CAUTIOUS/NORMAL/PERMISSIVE)
 - 🔄 Documentation integration (PDF parsing)
 
-### **🚀 Phase 4: Production & Packaging - PLANNED (0%)**
-- 🔄 Docker Compose deployment
-- 🔄 Single container: FastAPI + built Svelte app
-- 🔄 Cross-platform compatibility
-- 🔄 Installation documentation
+### **🚀 Phase 4: Production & Packaging - IN PROGRESS (60%)**
+- ✅ Docker Compose deployment
+- ✅ Multi-container setup: Backend + Frontend + Host Ollama
+- ✅ Cross-platform compatibility
+- ✅ Installation documentation (docs/DOCKER_SETUP.md)
+- 🔄 Production optimizations (HTTPS, secrets management)
+- 🔄 CI/CD pipeline configuration
 
 ---
 

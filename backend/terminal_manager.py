@@ -23,7 +23,7 @@ class SSHAuthenticationError(SSHConnectionError):
 
 class SSHTerminalSession:
     """Manages a single SSH terminal session"""
-    
+
     def __init__(self, session_id: str, host: str, port: int, username: str, password: Optional[str] = None, key_path: Optional[str] = None):
         self.session_id = session_id
         self.host = host
@@ -31,13 +31,16 @@ class SSHTerminalSession:
         self.username = username
         self.password = password
         self.key_path = key_path
-        
+
         self.connection: Optional[asyncssh.SSHClientConnection] = None
         self.process: Optional[asyncssh.SSHClientProcess] = None
         self.websocket = None
         self.is_connected = False
         self.created_at = datetime.utcnow()
         self._output_task = None
+
+        # Server context information (collected after connection)
+        self.server_context: Dict[str, str] = {}
         
     async def connect(self):
         """Establish SSH connection and create interactive shell"""
@@ -80,7 +83,10 @@ class SSHTerminalSession:
             
             # Start reading from SSH process
             self._output_task = asyncio.create_task(self._read_ssh_output())
-            
+
+            # Collect server context information
+            asyncio.create_task(self._collect_server_context())
+
             return True
 
         except (SSHConnectionError, SSHAuthenticationError):
@@ -90,6 +96,42 @@ class SSHTerminalSession:
             logger.error(f"Failed to connect SSH session {self.session_id}: {e}")
             self.is_connected = False
             raise SSHConnectionError(f"Unexpected error: {e}") from e
+
+    async def _collect_server_context(self):
+        """Collect server information for AI context"""
+        try:
+            # Wait a bit for shell to be ready
+            await asyncio.sleep(0.5)
+
+            # Run commands to gather system info
+            commands = {
+                'os': "uname -s 2>/dev/null || echo 'Unknown'",
+                'kernel': "uname -r 2>/dev/null || echo 'Unknown'",
+                'distro': "cat /etc/os-release 2>/dev/null | grep '^PRETTY_NAME=' | cut -d'\"' -f2 || lsb_release -ds 2>/dev/null || echo 'Unknown'",
+                'arch': "uname -m 2>/dev/null || echo 'Unknown'",
+                'hostname': "hostname 2>/dev/null || echo 'Unknown'",
+                'shell': "echo $SHELL 2>/dev/null || echo 'Unknown'",
+                'user': "whoami 2>/dev/null || echo 'Unknown'",
+                'home': "echo $HOME 2>/dev/null || echo 'Unknown'"
+            }
+
+            context = {}
+
+            for key, cmd in commands.items():
+                try:
+                    result = await self.connection.run(cmd, check=False, timeout=5)
+                    output = result.stdout.strip() if result.stdout else 'Unknown'
+                    context[key] = output
+                except Exception as e:
+                    logger.debug(f"Failed to collect {key}: {e}")
+                    context[key] = 'Unknown'
+
+            self.server_context = context
+            logger.info(f"Server context collected for {self.session_id}: {context.get('distro', 'Unknown')}, {context.get('arch', 'Unknown')}")
+
+        except Exception as e:
+            logger.warning(f"Error collecting server context for {self.session_id}: {e}")
+            self.server_context = {'error': 'Failed to collect context'}
     
     async def _read_ssh_output(self):
         """Continuously read output from SSH process and send to WebSocket"""
