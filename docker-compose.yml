@@ -1,8 +1,6 @@
 # Docker Compose configuration for Nexus SSH Terminal
 # Orchestrates backend (FastAPI) and frontend (Nginx) services
 
-version: '3.8'
-
 services:
   # ============================================
   # Backend Service (FastAPI + AsyncSSH)
@@ -35,7 +33,7 @@ services:
 
     # Development: Mount source for hot reload
     volumes:
-      - ./backend:/app:ro
+      - ./backend:/app
 
     networks:
       - nexus-network
@@ -78,11 +76,3 @@ networks:
   nexus-network:
     driver: bridge
     name: nexus-network
-
-# ============================================
-# Volumes (for future use)
-# ============================================
-volumes:
-  # Reserved for future database/config storage
-  nexus-data:
-    name: nexus-data

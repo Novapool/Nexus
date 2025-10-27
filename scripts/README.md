@@ -1,59 +1,41 @@
 # Nexus Helper Scripts
 
-These scripts make managing your Nexus Docker deployment easier.
+These scripts simplify Docker Compose operations for Nexus.
 
 ## Available Scripts
 
 ### `start.sh` - Start Nexus
 Starts all Nexus services using Docker Compose.
 
-**Usage:**
 ```bash
 ./scripts/start.sh
 ```
 
-**What it does:**
-- Checks if Docker and Ollama are installed and running
-- Creates `.env` from `.env.example` if missing
-- Starts all Docker containers
-- Shows service status and access URLs
+Creates `.env` from `.env.example` if missing, then starts all containers.
 
 ---
 
 ### `stop.sh` - Stop Nexus
 Stops all running Nexus containers.
 
-**Usage:**
 ```bash
 ./scripts/stop.sh
 ```
-
-**What it does:**
-- Gracefully stops all containers
-- Preserves data volumes
 
 ---
 
 ### `update.sh` - Update Nexus
 Pulls latest code and rebuilds containers.
 
-**Usage:**
 ```bash
 ./scripts/update.sh
 ```
-
-**What it does:**
-- Pulls latest code from git
-- Stops existing containers
-- Rebuilds Docker images
-- Starts updated containers
 
 ---
 
 ### `logs.sh` - View Logs
 Shows logs from Nexus services.
 
-**Usage:**
 ```bash
 # All services
 ./scripts/logs.sh
@@ -63,25 +45,16 @@ Shows logs from Nexus services.
 ./scripts/logs.sh frontend
 ```
 
-**What it does:**
-- Streams logs in real-time
-- Press Ctrl+C to exit
-
 ---
 
 ### `status.sh` - System Status
 Shows comprehensive status of all services.
 
-**Usage:**
 ```bash
 ./scripts/status.sh
 ```
 
-**What it does:**
-- Shows Docker container status
-- Checks Ollama availability and lists models
-- Tests endpoint health (frontend, backend)
-- Displays resource usage (CPU, memory)
+Displays Docker container status, Ollama availability, endpoint health, and resource usage.
 
 ---
 
@@ -99,59 +72,40 @@ Shows comprehensive status of all services.
 
 # Updates
 ./scripts/update.sh        # Get latest version
-
-# Troubleshooting
-./scripts/logs.sh backend  # Check backend logs
-./scripts/status.sh        # Check what's running
 ```
 
----
-
-## Manual Docker Commands
-
-If you prefer using Docker Compose directly:
+## Direct Docker Commands
 
 ```bash
 # Start
-docker-compose up -d
+docker compose up -d
 
 # Stop
-docker-compose down
+docker compose down
 
 # Logs
-docker-compose logs -f
-
-# Status
-docker-compose ps
+docker compose logs -f [service]
 
 # Rebuild
-docker-compose up -d --build
-
-# Complete cleanup
-docker-compose down -v
+docker compose up -d --build
 ```
-
----
 
 ## Troubleshooting
 
-**Script won't run:**
-```bash
-chmod +x scripts/*.sh  # Make scripts executable
+**AI chat not working?**
+
+1. Check backend logs: `./scripts/logs.sh backend`
+2. Ensure Ollama is running: `ollama list`
+3. Verify .env has: `OLLAMA_HOST=host.docker.internal`
+
+**Linux-specific:** Ollama must listen on all interfaces (0.0.0.0), not just localhost.
+
+Create `/etc/systemd/system/ollama.service.d/override.conf`:
+```ini
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
 ```
 
-**Permission denied:**
-```bash
-sudo usermod -aG docker $USER  # Add yourself to docker group
-# Log out and back in
-```
+Then restart: `sudo systemctl daemon-reload && sudo systemctl restart ollama`
 
-**Ollama not found:**
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull gpt-oss:20b
-```
-
----
-
-For more help, see [docs/DOCKER_SETUP.md](../docs/DOCKER_SETUP.md)
+For more help, see project documentation.

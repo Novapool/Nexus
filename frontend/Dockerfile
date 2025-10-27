@@ -28,11 +28,8 @@ FROM nginx:alpine
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy built files from builder stage
+# Copy built files from builder stage (adapter-static bundles everything here)
 COPY --from=builder /app/build /usr/share/nginx/html
-
-# Copy static files if they exist
-COPY --from=builder /app/static /usr/share/nginx/html/static || true
 
 # Expose port 80
 EXPOSE 80

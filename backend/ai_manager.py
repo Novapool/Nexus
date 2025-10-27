@@ -126,7 +126,7 @@ Stay concise. Commands first, minimal explanation.
 
     async def _stream_ollama_response(self, messages: list) -> None:
         """Stream response from Ollama with timeout handling (Python 3.8 compatible)"""
-        client = AsyncClient(host=OLLAMA_BASE_URL)
+        client = AsyncClient(OLLAMA_BASE_URL)
 
         # Note: client.chat() with stream=True needs to be awaited to get the async generator
         stream = await client.chat(model=self.model, messages=messages, stream=True)
@@ -342,7 +342,7 @@ class AIManager:
         """Check if Ollama is accessible"""
         try:
             # Try to list models to verify connection
-            client = AsyncClient(host=OLLAMA_BASE_URL)
+            client = AsyncClient(OLLAMA_BASE_URL)
             models = await client.list()
             logger.info(f"Ollama connection successful. Available models: {len(models.get('models', []))}")
         except Exception as e:
